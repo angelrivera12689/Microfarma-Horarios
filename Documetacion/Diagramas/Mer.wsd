@@ -1,0 +1,134 @@
+@startuml ER Diagram
+entity Empresa {
+  * id : number
+  --
+  * nombre : string
+}
+
+entity Sede {
+  * id : number
+  --
+  * nombre : string
+  * empresaId : number
+}
+
+entity Empleado {
+  * id : number
+  --
+  * nombre : string
+  * email : string
+  * cargoId : number
+  * tipoContratoId : number
+}
+
+entity Cargo {
+  * id : number
+  --
+  * nombre : string
+}
+
+entity TipoContrato {
+  * id : number
+  --
+  * nombre : string
+}
+
+entity EmpleadoSede {
+  * empleadoId : number
+  * sedeId : number
+  --
+  * fechaAsignacion : date
+}
+
+entity Turno {
+  * id : number
+  --
+  * empleadoId : number
+  * tipoTurnoId : number
+  * calendarioId : number
+  * fecha : date
+  * horaInicio : time
+  * horaFin : time
+}
+
+entity TipoTurno {
+  * id : number
+  --
+  * nombre : string
+  * nocturno : boolean
+}
+
+entity Calendario {
+  * id : number
+  --
+  * nombre : string
+  * anio : number
+}
+
+entity Novedad {
+  * id : number
+  --
+  * empleadoId : number
+  * tipoNovedadId : number
+  * descripcion : string
+  * fecha : date
+}
+
+entity TipoNovedad {
+  * id : number
+  --
+  * nombre : string
+}
+
+entity Usuario {
+  * id : number
+  --
+  * nombre : string
+  * email : string
+  * passwordHash : string
+  * activo : boolean
+  * rolId : number
+}
+
+entity Rol {
+  * id : number
+  --
+  * nombre : string
+}
+
+entity Permiso {
+  * id : number
+  --
+  * nombre : string
+  * descripcion : string
+}
+
+entity RolPermiso {
+  * rolId : number
+  * permisoId : number
+}
+
+entity RefreshToken {
+  * id : number
+  --
+  * usuarioId : number
+  * token : string
+  * fechaExpiracion : datetime
+  * revocado : boolean
+}
+
+Empresa ||--o{ Sede : "tiene"
+Sede ||--o{ EmpleadoSede : "asigna"
+Empleado ||--o{ EmpleadoSede : "pertenece"
+Empleado ||--|| Cargo : "tiene"
+Empleado ||--|| TipoContrato : "tiene"
+Empleado ||--o{ Turno : "trabaja"
+Turno ||--|| TipoTurno : "es de"
+Turno ||--|| Calendario : "pertenece a"
+Empleado ||--o{ Novedad : "reporta"
+Novedad ||--|| TipoNovedad : "es de"
+Usuario ||--|| Rol : "tiene"
+Rol ||--o{ RolPermiso : "tiene"
+Permiso ||--o{ RolPermiso : "asignado a"
+Usuario ||--o{ RefreshToken : "genera"
+@enduml
