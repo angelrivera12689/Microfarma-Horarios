@@ -39,19 +39,44 @@ public class UserServiceSecurity extends ASecurityBaseService<User> implements I
     public User save(User entity) throws Exception {
         User savedUser = super.save(entity);
 
-        // Associate with existing Employee if email matches
-        try {
-            Optional<Employee> existingEmployee = employeeService.findByEmail(savedUser.getEmail());
-            if (existingEmployee.isPresent() && existingEmployee.get().getUser() == null) {
-                Employee employee = existingEmployee.get();
-                employee.setUser(savedUser);
-                savedUser.setEmployee(employee);
-                employeeService.save(employee); // Update Employee
-                repository.save(savedUser); // Update User
+        // If role is EMPLOYEE, create employee if not exists
+        if (savedUser.getRole() != null && "EMPLOYEE".equals(savedUser.getRole().getName())) {
+            try {
+                Optional<Employee> existingEmployee = employeeService.findByEmail(savedUser.getEmail());
+                if (existingEmployee.isEmpty()) {
+                    Employee employee = new Employee();
+                    employee.setEmail(savedUser.getEmail());
+                    employee.setFirstName(savedUser.getName());
+                    employee.setLastName("");
+                    employee.setHireDate(java.time.LocalDate.now());
+                    employee.setUser(savedUser);
+                    savedUser.setEmployee(employee);
+                    employeeService.save(employee);
+                } else if (existingEmployee.get().getUser() == null) {
+                    Employee employee = existingEmployee.get();
+                    employee.setUser(savedUser);
+                    savedUser.setEmployee(employee);
+                    employeeService.save(employee);
+                }
+            } catch (Exception e) {
+                // Log but don't fail
+                System.err.println("Error creating or associating Employee: " + e.getMessage());
             }
-        } catch (Exception e) {
-            // Log but don't fail
-            System.err.println("Error associating User with Employee: " + e.getMessage());
+        } else {
+            // Associate with existing Employee if email matches
+            try {
+                Optional<Employee> existingEmployee = employeeService.findByEmail(savedUser.getEmail());
+                if (existingEmployee.isPresent() && existingEmployee.get().getUser() == null) {
+                    Employee employee = existingEmployee.get();
+                    employee.setUser(savedUser);
+                    savedUser.setEmployee(employee);
+                    employeeService.save(employee); // Update Employee
+                    repository.save(savedUser); // Update User
+                }
+            } catch (Exception e) {
+                // Log but don't fail
+                System.err.println("Error associating User with Employee: " + e.getMessage());
+            }
         }
 
         return savedUser;
@@ -60,7 +85,7 @@ public class UserServiceSecurity extends ASecurityBaseService<User> implements I
     @Override
     public void updatePassword(User user, String encodedNewPassword) throws Exception {
         user.setPasswordHash(encodedNewPassword);
-        this.save(user); // Use the overridden save method for consistency
+        repository.save(user);
     }
 
     @Override

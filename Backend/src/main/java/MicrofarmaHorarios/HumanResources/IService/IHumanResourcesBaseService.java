@@ -51,11 +51,4 @@ public interface IHumanResourcesBaseService<T extends AHumanResourcesBaseEntity>
      * @throws Exception If an error occurs while deleting the entity.
      */
     void delete(String id) throws Exception;
-
-    /**
-     * Hard deletes an entity.
-     * @param entity The entity to hard delete.
-     * @throws Exception If an error occurs while deleting the entity.
-     */
-    void hardDelete(T entity) throws Exception;
 }

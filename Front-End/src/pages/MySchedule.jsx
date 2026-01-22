@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import shiftService from '../services/shiftService';
-import shiftChangeRequestService from '../services/shiftChangeRequestService';
-import Modal from '../components/Modal';
+import authService from '../services/authService';
 
 const MySchedule = () => {
+  const user = authService.getCurrentUser();
+  const navigate = useNavigate();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -11,11 +13,6 @@ const MySchedule = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [filter, setFilter] = useState('all'); // 'all', 'upcoming', 'past'
-
-  // Request change modal state
-  const [requestModalOpen, setRequestModalOpen] = useState(false);
-  const [selectedShift, setSelectedShift] = useState(null);
-  const [requestReason, setRequestReason] = useState('');
 
   useEffect(() => {
     loadMyShifts();
@@ -36,43 +33,6 @@ const MySchedule = () => {
       setError('Error de conexión al cargar turnos');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const openRequestModal = (shift) => {
-    setSelectedShift(shift);
-    setRequestReason('');
-    setRequestModalOpen(true);
-  };
-
-  const closeRequestModal = () => {
-    setRequestModalOpen(false);
-    setSelectedShift(null);
-    setRequestReason('');
-  };
-
-  const submitRequest = async () => {
-    if (!requestReason.trim()) {
-      alert('Por favor ingresa una razón para la solicitud');
-      return;
-    }
-
-    try {
-      const requestData = {
-        originalShiftId: selectedShift.id,
-        reason: requestReason
-      };
-
-      const response = await shiftChangeRequestService.createRequest(requestData);
-      if (response.status) {
-        alert('Solicitud de cambio enviada exitosamente');
-        closeRequestModal();
-      } else {
-        alert('Error al enviar la solicitud: ' + (response.message || 'Error desconocido'));
-      }
-    } catch (error) {
-      console.error('Error submitting request:', error);
-      alert('Error de conexión al enviar la solicitud');
     }
   };
 
@@ -334,7 +294,7 @@ const MySchedule = () => {
                         <p className="text-sm text-gray-500 italic">Nota: {shift.notes}</p>
                       )}
                     </div>
-                    <div className="text-left sm:text-right flex flex-col sm:items-end gap-2">
+                    <div className="text-left sm:text-right">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         (() => {
                           const [year, month, day] = shift.date.split('-');
@@ -352,20 +312,6 @@ const MySchedule = () => {
                           return shiftDate >= today ? 'Próximo' : 'Pasado';
                         })()}
                       </span>
-                      {(() => {
-                        const [year, month, day] = shift.date.split('-');
-                        const shiftDate = new Date(year, month - 1, day);
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        return shiftDate >= today;
-                      })() && (
-                        <button
-                          onClick={() => openRequestModal(shift)}
-                          className="px-3 py-1 bg-orange-500 text-white text-xs rounded hover:bg-orange-600 transition-colors"
-                        >
-                          Solicitar Cambio
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))
@@ -384,58 +330,6 @@ const MySchedule = () => {
           )}
         </div>
       </main>
-
-      <Modal
-        isOpen={requestModalOpen}
-        onClose={closeRequestModal}
-        title="Solicitar Cambio de Turno"
-        size="md"
-      >
-        <div className="space-y-4">
-          {selectedShift && (
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h3 className="font-semibold text-gray-900 mb-2">Turno Actual</h3>
-              <div className="text-sm text-gray-600">
-                <p><strong>Fecha:</strong> {selectedShift.date ? selectedShift.date.split('-').reverse().join('/') : ''}</p>
-                <p><strong>Tipo:</strong> {selectedShift.shiftType?.name}</p>
-                <p><strong>Ubicación:</strong> {selectedShift.location?.name}</p>
-                <p><strong>Horario:</strong> {selectedShift.shiftType?.startTime?.slice(0, 5)} - {selectedShift.shiftType?.endTime?.slice(0, 5)}</p>
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-2">
-              Razón de la solicitud *
-            </label>
-            <textarea
-              id="reason"
-              value={requestReason}
-              onChange={(e) => setRequestReason(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-              placeholder="Explica por qué necesitas cambiar este turno..."
-              required
-            />
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4">
-            <button
-              type="button"
-              onClick={closeRequestModal}
-              className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 font-medium"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={submitRequest}
-              className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all duration-200 font-medium"
-            >
-              Enviar Solicitud
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };

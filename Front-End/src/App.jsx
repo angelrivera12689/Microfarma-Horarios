@@ -17,12 +17,9 @@ import Positions from './pages/hr/Positions';
 import Contracts from './pages/hr/Contracts';
 import Companies from './pages/org/Companies';
 import Locations from './pages/org/Locations';
-import Calendars from './pages/schedules/Calendars';
 import ShiftTypes from './pages/schedules/ShiftTypes';
 import Shifts from './pages/schedules/Shifts';
-import Schedules from './pages/schedules/Schedules';
-import ShiftChangeRequests from './pages/schedules/ShiftChangeRequests';
-import ShiftChangeRequestsAdmin from './pages/schedules/ShiftChangeRequestsAdmin';
+import Reports from './pages/schedules/Reports';
 import News from './pages/news/News';
 import NewsTypes from './pages/news/NewsTypes';
 import Email from './pages/notifications/Email';
@@ -186,14 +183,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/shift-change-requests"
-          element={
-            <ProtectedRoute>
-              <ShiftChangeRequests />
-            </ProtectedRoute>
-          }
-        />
 
         {/* Admin Dashboard Routes */}
         <Route
@@ -213,11 +202,9 @@ function App() {
           <Route path="hr/contracts" element={<Contracts />} />
           <Route path="org/companies" element={<Companies />} />
           <Route path="org/locations" element={<Locations />} />
-          <Route path="schedules/calendars" element={<Calendars />} />
           <Route path="schedules/shifttypes" element={<ShiftTypes />} />
           <Route path="schedules/shifts" element={<Shifts />} />
-          <Route path="schedules/schedules" element={<Schedules />} />
-          <Route path="schedules/shift-change-requests" element={<ShiftChangeRequestsAdmin />} />
+          <Route path="schedules/reports" element={<Reports />} />
           <Route path="news/news" element={<News />} />
           <Route path="news/types" element={<NewsTypes />} />
           <Route path="notifications/email" element={<Email />} />

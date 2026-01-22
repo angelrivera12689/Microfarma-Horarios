@@ -26,8 +26,8 @@ public class DataInitializer implements CommandLineRunner {
     public void run(String... args) throws Exception {
         // Create default roles if they don't exist
         createRoleIfNotExists("USER");
-        createRoleIfNotExists("EMPLOYEE");
         createRoleIfNotExists("ADMIN");
+        createRoleIfNotExists("EMPLOYEE");
 
         // Create default admin user if it doesn't exist
         createAdminUserIfNotExists();

@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import shiftService from '../../services/shiftService';
-import shiftChangeRequestService from '../../services/shiftChangeRequestService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
@@ -15,15 +14,11 @@ const Shifts = () => {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
-  const [viewMode, setViewMode] = useState('table'); // 'table', 'calendar', or 'requests'
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'calendar'
   const [selectedLocation, setSelectedLocation] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const calendarRef = useRef();
-
-  // Shift change requests state
-  const [shiftChangeRequests, setShiftChangeRequests] = useState([]);
-  const [loadingRequests, setLoadingRequests] = useState(false);
   const [formData, setFormData] = useState({
     date: '',
     employeeId: '',
@@ -92,42 +87,6 @@ const Shifts = () => {
       }
     } catch (error) {
       console.error('Error loading shift types:', error);
-    }
-  };
-
-  const loadShiftChangeRequests = async () => {
-    try {
-      setLoadingRequests(true);
-      const response = await shiftChangeRequestService.getPendingRequests();
-      if (response.data) {
-        setShiftChangeRequests(Array.isArray(response.data) ? response.data : []);
-      } else {
-        console.error('Failed to load shift change requests:', response.message);
-      }
-    } catch (error) {
-      console.error('Error loading shift change requests:', error);
-    } finally {
-      setLoadingRequests(false);
-    }
-  };
-
-  const handleDecideRequest = async (requestId, approved, decision) => {
-    try {
-      const decisionData = {
-        approved: approved,
-        adminDecision: decision
-      };
-
-      const response = await shiftChangeRequestService.decideRequest(requestId, decisionData);
-      if (response.status) {
-        alert(approved ? 'Solicitud aprobada exitosamente' : 'Solicitud rechazada exitosamente');
-        await loadShiftChangeRequests();
-      } else {
-        alert('Error al procesar la solicitud: ' + (response.message || 'Error desconocido'));
-      }
-    } catch (error) {
-      console.error('Error deciding request:', error);
-      alert('Error de conexión al procesar la solicitud');
     }
   };
 
@@ -317,19 +276,6 @@ const Shifts = () => {
               Vista Calendario
             </button>
             <button
-              onClick={() => {
-                setViewMode('requests');
-                loadShiftChangeRequests();
-              }}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                viewMode === 'requests'
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Solicitudes de Cambio
-            </button>
-            <button
               onClick={exportToCSV}
               className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
             >
@@ -415,7 +361,7 @@ const Shifts = () => {
             searchPlaceholder="Buscar turnos..."
             emptyMessage="No hay turnos registrados en el sistema"
           />
-        ) : viewMode === 'calendar' ? (
+        ) : (
           <div className="bg-white">
             <div ref={calendarRef} className="grid grid-cols-7 gap-2 border border-gray-300 rounded-lg overflow-hidden shadow-lg">
               {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => (
@@ -424,91 +370,6 @@ const Shifts = () => {
                 </div>
               ))}
               {renderCalendar()}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Solicitudes de Cambio de Turno</h2>
-
-              {loadingRequests ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Cargando solicitudes...</p>
-                </div>
-              ) : shiftChangeRequests.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No hay solicitudes pendientes
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {shiftChangeRequests.map((request) => (
-                    <div key={request.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {request.employeeName}
-                          </h3>
-                          <p className="text-sm text-gray-600">
-                            Solicitado el {new Date(request.createdAt).toLocaleDateString('es-ES')}
-                          </p>
-                        </div>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => {
-                              const decision = prompt('Comentarios para aprobar la solicitud:');
-                              if (decision !== null) {
-                                handleDecideRequest(request.id, true, decision);
-                              }
-                            }}
-                            className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600"
-                          >
-                            ✅ Aprobar
-                          </button>
-                          <button
-                            onClick={() => {
-                              const decision = prompt('Razón del rechazo:');
-                              if (decision !== null) {
-                                handleDecideRequest(request.id, false, decision);
-                              }
-                            }}
-                            className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-                          >
-                            ❌ Rechazar
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                        <div>
-                          <h4 className="font-medium text-gray-900 mb-1">Turno Actual</h4>
-                          <div className="text-sm text-gray-600 bg-white p-2 rounded">
-                            <p><strong>Fecha:</strong> {request.originalDate ? request.originalDate.split('-').reverse().join('/') : ''}</p>
-                            <p><strong>Tipo:</strong> {request.originalShiftType}</p>
-                            <p><strong>Ubicación:</strong> {request.originalLocation}</p>
-                          </div>
-                        </div>
-
-                        {(request.requestedDate || request.requestedShiftType || request.requestedLocation) && (
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-1">Cambios Solicitados</h4>
-                            <div className="text-sm text-gray-600 bg-white p-2 rounded">
-                              {request.requestedDate && <p><strong>Fecha:</strong> {request.requestedDate.split('-').reverse().join('/')}</p>}
-                              {request.requestedShiftType && <p><strong>Tipo:</strong> {request.requestedShiftType}</p>}
-                              {request.requestedLocation && <p><strong>Ubicación:</strong> {request.requestedLocation}</p>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 mb-1">Razón</h4>
-                        <p className="text-sm text-gray-600 bg-white p-2 rounded">{request.reason}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         )}

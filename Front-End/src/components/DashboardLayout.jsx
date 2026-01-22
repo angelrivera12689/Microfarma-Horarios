@@ -70,7 +70,7 @@ const DashboardLayout = () => {
             <div className="flex items-center space-x-4">
               {/* Reports Button */}
               <button
-                onClick={() => navigate('/reports')}
+                onClick={() => navigate('/dashboard/schedules/reports')}
                 className="flex items-center space-x-2 px-3 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors duration-200 text-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

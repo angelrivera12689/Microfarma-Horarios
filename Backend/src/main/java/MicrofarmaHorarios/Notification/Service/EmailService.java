@@ -14,7 +14,6 @@ import MicrofarmaHorarios.Notification.Entity.EmailHistory;
 import MicrofarmaHorarios.Notification.IService.IEmailHistoryService;
 import MicrofarmaHorarios.Notification.IService.IEmailService;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
-import MicrofarmaHorarios.Schedules.Entity.ShiftChangeRequest;
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.Security.Entity.User;
 
@@ -219,19 +218,11 @@ public class EmailService implements IEmailService {
     }
 
     public void sendWelcomeEmail(Employee employee) throws Exception {
-        sendWelcomeEmail(employee, null);
-    }
-
-    public void sendWelcomeEmail(Employee employee, String tempPassword) throws Exception {
         if (employee.getEmail() == null || employee.getEmail().isEmpty()) {
             return;
         }
 
         String subject = "Bienvenido a Microfarma Horarios";
-        String passwordSection = (tempPassword != null) ?
-            "<p><strong>Tu contraseña temporal es:</strong> " + tempPassword + "</p>" +
-            "<p>Por favor, inicia sesión y cambia tu contraseña lo antes posible.</p>" : "";
-
         String body = "<!DOCTYPE html><html><head><style>" +
                       "body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;}" +
                       ".container{background:white;border-radius:10px;padding:20px;margin:0 auto;max-width:600px;box-shadow:0 0 10px rgba(0,0,0,0.1);}" +
@@ -247,7 +238,6 @@ public class EmailService implements IEmailService {
                       "<div class='welcome-message'>" +
                       "<p>¡Bienvenido al equipo de Microfarma! Estamos emocionados de tenerte con nosotros.</p>" +
                       "<p>Tu cuenta ha sido creada exitosamente en nuestro sistema de horarios.</p>" +
-                      passwordSection +
                       "</div>" +
                       "<p>Pronto recibirás información sobre tus turnos asignados. Si tienes alguna pregunta, no dudes en contactar a tu supervisor.</p>" +
                       "</div>" +
@@ -306,77 +296,6 @@ public class EmailService implements IEmailService {
                       "<p>El equipo de Microfarma te desea un día lleno de alegría y felicidad.</p>" +
                       "<p>¡Que tengas un año maravilloso!</p>" +
                       "</div>" +
-                      "</div>" +
-                      "<div class='footer'>" +
-                      "<p>Saludos,<br>Equipo de Microfarma Horarios</p>" +
-                      "</div></div></body></html>";
-
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true);
-        helper.setTo(employee.getEmail());
-        helper.setSubject(subject);
-        helper.setText(body, true);
-
-        try {
-            mailSender.send(message);
-            EmailHistory history = new EmailHistory();
-            history.setRecipient(employee.getEmail());
-            history.setSubject(subject);
-            history.setBody(body);
-            history.setSentAt(LocalDateTime.now());
-            history.setDeliveryStatus(DeliveryStatus.SENT);
-            emailHistoryService.save(history);
-        } catch (Exception e) {
-            EmailHistory history = new EmailHistory();
-            history.setRecipient(employee.getEmail());
-            history.setSubject(subject);
-            history.setBody(body);
-            history.setSentAt(LocalDateTime.now());
-            history.setDeliveryStatus(DeliveryStatus.FAILED);
-            history.setErrorMessage(e.getMessage());
-            emailHistoryService.save(history);
-            throw e;
-        }
-    }
-
-    public void sendShiftChangeRequestNotification(ShiftChangeRequest request) throws Exception {
-        // Send to admins - for now, we'll assume admins have a specific email or we need to get all admin emails
-        // For simplicity, let's send to a hardcoded admin email or skip for now
-        // In a real implementation, you'd query for admin users and send to them
-        // For this demo, we'll just log it
-        System.out.println("Notification sent to admins: New shift change request from " + request.getEmployee().getFirstName() + " " + request.getEmployee().getLastName());
-    }
-
-    public void sendShiftChangeRequestDecision(ShiftChangeRequest request) throws Exception {
-        Employee employee = request.getEmployee();
-        if (employee.getEmail() == null || employee.getEmail().isEmpty()) {
-            return;
-        }
-
-        String subject = "Decisión sobre tu solicitud de cambio de turno - Microfarma Horarios";
-        String decisionText = request.getRequestStatus() == MicrofarmaHorarios.Schedules.Entity.RequestStatus.APPROVED ? "aprobada" : "rechazada";
-        String body = "<!DOCTYPE html><html><head><style>" +
-                      "body{font-family:Arial,sans-serif;background:#f5f5f5;padding:20px;}" +
-                      ".container{background:white;border-radius:10px;padding:20px;margin:0 auto;max-width:600px;box-shadow:0 0 10px rgba(0,0,0,0.1);}" +
-                      ".header{background:" + (request.getRequestStatus() == MicrofarmaHorarios.Schedules.Entity.RequestStatus.APPROVED ? "#4caf50" : "#f44336") + ";color:white;padding:15px;text-align:center;border-radius:10px 10px 0 0;}" +
-                      ".content{padding:20px;}" +
-                      ".request-info{background:#f5f5f5;padding:15px;border-radius:5px;margin:10px 0;border-left:4px solid " + (request.getRequestStatus() == MicrofarmaHorarios.Schedules.Entity.RequestStatus.APPROVED ? "#4caf50" : "#f44336") + ";}" +
-                      ".footer{text-align:center;color:#666;margin-top:20px;}" +
-                      "</style></head><body>" +
-                      "<div class='container'>" +
-                      "<div class='header'><h2>" + (request.getRequestStatus() == MicrofarmaHorarios.Schedules.Entity.RequestStatus.APPROVED ? "✅ Solicitud Aprobada" : "❌ Solicitud Rechazada") + "</h2></div>" +
-                      "<div class='content'>" +
-                      "<h3>Hola " + employee.getFirstName() + " " + employee.getLastName() + ",</h3>" +
-                      "<p>Tu solicitud de cambio de turno ha sido <strong>" + decisionText + "</strong>.</p>" +
-                      "<div class='request-info'>" +
-                      "<strong>📅 Turno Original:</strong> " + request.getOriginalShift().getDate() + " - " + request.getOriginalShift().getShiftType().getName() + "<br>" +
-                      (request.getRequestedDate() != null ? "<strong>📅 Fecha Solicitada:</strong> " + request.getRequestedDate() + "<br>" : "") +
-                      (request.getRequestedShiftType() != null ? "<strong>⏰ Tipo Solicitado:</strong> " + request.getRequestedShiftType().getName() + "<br>" : "") +
-                      (request.getRequestedLocation() != null ? "<strong>🏢 Ubicación Solicitada:</strong> " + request.getRequestedLocation().getName() + "<br>" : "") +
-                      "<strong>📝 Razón:</strong> " + request.getReason() + "<br>" +
-                      (request.getAdminDecision() != null && !request.getAdminDecision().isEmpty() ? "<strong>💬 Decisión del Admin:</strong> " + request.getAdminDecision() : "") +
-                      "</div>" +
-                      (request.getRequestStatus() == MicrofarmaHorarios.Schedules.Entity.RequestStatus.APPROVED ? "<p>Los cambios han sido aplicados a tu turno.</p>" : "<p>Si tienes alguna duda sobre la decisión, contacta a tu supervisor.</p>") +
                       "</div>" +
                       "<div class='footer'>" +
                       "<p>Saludos,<br>Equipo de Microfarma Horarios</p>" +

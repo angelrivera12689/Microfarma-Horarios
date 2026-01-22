@@ -6,12 +6,9 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.RequestMethod;
 
 import MicrofarmaHorarios.Security.DTO.Request.*;
 import MicrofarmaHorarios.Security.DTO.Response.*;
-
-import java.util.Map;
 
 import MicrofarmaHorarios.Security.Entity.User;
 
@@ -41,7 +38,6 @@ import MicrofarmaHorarios.Security.Utils.JwtUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Date;
-import java.util.Map;
 
 @RestController
 
@@ -142,6 +138,32 @@ public class AuthControllerSecurity {
                 return ResponseEntity.badRequest().body(new ApiResponseDto<String>("El email ya está registrado. Por favor usa un email diferente.", null, false));
             }
 
+            // Create employee if not exists
+            if (employeeService.findByEmail(registerRequest.getEmail()).isEmpty()) {
+                Employee employee = new Employee();
+                String[] nameParts = registerRequest.getName().split(" ");
+                employee.setFirstName(nameParts[0]);
+                employee.setLastName(nameParts.length > 1 ? nameParts[1] : "");
+                employee.setEmail(registerRequest.getEmail());
+                employee.setHireDate(java.time.LocalDate.now());
+
+                // Get default position and contract type
+                try {
+                    var positions = positionService.all();
+                    if (!positions.isEmpty()) {
+                        employee.setPosition(positions.get(0));
+                    }
+                    var contracts = contractTypeService.all();
+                    if (!contracts.isEmpty()) {
+                        employee.setContractType(contracts.get(0));
+                    }
+                } catch (Exception e) {
+                    // Ignore if services fail
+                }
+
+                employeeService.save(employee);
+            }
+
             User user = new User();
 
             user.setName(registerRequest.getName());
@@ -155,6 +177,16 @@ public class AuthControllerSecurity {
             user.setRole(role);
 
             user.setActive(true);
+
+            // Link to employee if exists
+            try {
+                var employee = employeeService.findByEmail(registerRequest.getEmail());
+                if (employee.isPresent()) {
+                    user.setEmployee(employee.get());
+                }
+            } catch (Exception e) {
+                // Ignore if employee service fails, user can still register
+            }
 
             userService.save(user);
 
@@ -215,64 +247,6 @@ public class AuthControllerSecurity {
 
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponseDto<String>("Error: " + e.getMessage(), null, false));
-        }
-    }
-
-    public static class VerifyTokenRequest {
-        private String token;
-
-        public String getToken() { return token; }
-        public void setToken(String token) { this.token = token; }
-    }
-
-    @RequestMapping(value = "/verify-token", method = {RequestMethod.GET, RequestMethod.POST})
-    public ResponseEntity<ApiResponseDto<String>> verifyToken(@RequestParam(required = false) String token, @RequestBody(required = false) Map<String, Object> body) {
-        try {
-            System.out.println("Verify token request received, query token: " + token + ", body: " + body);
-            if (passwordResetTokenService == null) {
-                System.err.println("passwordResetTokenService is null");
-                return ResponseEntity.status(500).body(new ApiResponseDto<String>("Servicio no disponible", null, false));
-            }
-
-            String tokenValue = token;
-            if (tokenValue == null && body != null) {
-                Object tokenObj = body.get("token");
-                if (tokenObj == null) {
-                    tokenObj = body.get("code"); // Try "code" if "token" not found
-                }
-                if (tokenObj instanceof String) {
-                    tokenValue = (String) tokenObj;
-                } else if (tokenObj instanceof Map) {
-                    // Handle nested map
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> nested = (Map<String, Object>) tokenObj;
-                    Object nestedToken = nested.get("token");
-                    if (nestedToken == null) {
-                        nestedToken = nested.get("code");
-                    }
-                    if (nestedToken instanceof String) {
-                        tokenValue = (String) nestedToken;
-                    }
-                }
-            }
-
-            System.out.println("Token extracted: " + tokenValue);
-            if (tokenValue == null || tokenValue.trim().isEmpty()) {
-                System.out.println("Token is null or empty");
-                return ResponseEntity.badRequest().body(new ApiResponseDto<String>("Token es requerido.", null, false));
-            }
-
-            boolean isValid = passwordResetTokenService.isTokenValid(tokenValue);
-            System.out.println("Token valid: " + isValid);
-            if (isValid) {
-                return ResponseEntity.ok(new ApiResponseDto<String>("Token válido.", null, true));
-            } else {
-                return ResponseEntity.badRequest().body(new ApiResponseDto<String>("Token inválido o expirado.", null, false));
-            }
-        } catch (Exception e) {
-            System.err.println("Error verifying token: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(new ApiResponseDto<String>("Error interno del servidor: " + e.getMessage(), null, false));
         }
     }
 

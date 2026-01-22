@@ -34,9 +34,7 @@ const Employees = () => {
     try {
       const response = await employeeService.getAllEmployees();
       if (response.data) {
-        const allEmployees = Array.isArray(response.data) ? response.data : [];
-        const activeEmployees = allEmployees.filter(emp => emp.status === true);
-        setEmployees(activeEmployees);
+        setEmployees(Array.isArray(response.data) ? response.data : []);
       } else {
         console.error('Failed to load employees:', response.message);
         alert('Error al cargar empleados: ' + (response.message || 'Error desconocido'));

@@ -64,19 +64,10 @@ public class PasswordResetTokenServiceSecurity extends ASecurityBaseService<Pass
 
     @Override
     public boolean isTokenValid(String token) throws Exception {
-        System.out.println("Checking token validity for: " + token);
-        if (repository == null) {
-            System.err.println("Repository is null");
-            throw new Exception("Repository not available");
-        }
         Optional<PasswordResetToken> resetToken = repository.findByToken(token);
-        System.out.println("Token found in DB: " + resetToken.isPresent());
         if (resetToken.isPresent()) {
             PasswordResetToken t = resetToken.get();
-            boolean notUsed = !t.getUsed();
-            boolean notExpired = t.getExpiryDate().isAfter(LocalDateTime.now());
-            System.out.println("Token not used: " + notUsed + ", not expired: " + notExpired + ", expiry: " + t.getExpiryDate() + ", now: " + LocalDateTime.now());
-            return notUsed && notExpired;
+            return !t.getUsed() && t.getExpiryDate().isAfter(LocalDateTime.now());
         }
         return false;
     }

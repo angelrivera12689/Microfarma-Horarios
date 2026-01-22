@@ -18,8 +18,6 @@ const Users = () => {
     roleId: ''
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   useEffect(() => {
     const user = authService.getCurrentUser();
     console.log('Current user:', user);
@@ -70,7 +68,6 @@ const Users = () => {
       password: '',
       roleId: ''
     });
-    setIsSubmitting(false);
     setModalOpen(true);
   };
 
@@ -82,7 +79,6 @@ const Users = () => {
       password: '',
       roleId: user.role?.id || ''
     });
-    setIsSubmitting(false);
     setModalOpen(true);
   };
 
@@ -99,38 +95,29 @@ const Users = () => {
   };
 
   const handleSubmit = async (e) => {
-   e.preventDefault();
-   setIsSubmitting(true);
+    e.preventDefault();
 
-   try {
-     const userData = {
-       name: formData.name,
-       email: formData.email,
-       role: { id: formData.roleId }
-     };
+    try {
+      const userData = {
+        name: formData.name,
+        email: formData.email,
+        role: { id: formData.roleId }
+      };
 
-     let response;
-     if (editingUser) {
-       response = await userService.updateUser(editingUser.id, userData);
-     } else {
-       userData.passwordHash = formData.password; // For new users
-       response = await userService.createUser(userData);
-     }
+      if (editingUser) {
+        await userService.updateUser(editingUser.id, userData);
+      } else {
+        userData.passwordHash = formData.password; // For new users
+        await userService.createUser(userData);
+      }
 
-     if (!response.status) {
-       alert('Error al guardar el usuario: ' + (response.message || 'Error desconocido'));
-       return;
-     }
-
-     setModalOpen(false);
-     await loadUsers();
-     setIsSubmitting(false);
-   } catch (error) {
-     console.error('Error saving user:', error);
-     alert('Error al guardar el usuario');
-     setIsSubmitting(false);
-   }
- };
+      setModalOpen(false);
+      await loadUsers();
+    } catch (error) {
+      console.error('Error saving user:', error);
+      alert('Error al guardar el usuario');
+    }
+  };
 
   const columns = [
     { key: 'name', header: 'Nombre', render: (value) => <span className="font-medium">{value}</span> },
@@ -258,10 +245,9 @@ const Users = () => {
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
             >
-              {isSubmitting ? 'Cargando...' : `${editingUser ? 'Actualizar' : 'Crear'} Usuario`}
+              {editingUser ? 'Actualizar' : 'Crear'} Usuario
             </button>
           </div>
         </form>

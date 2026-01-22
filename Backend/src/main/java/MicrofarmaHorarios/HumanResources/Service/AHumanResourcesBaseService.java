@@ -130,15 +130,4 @@ abstract public class AHumanResourcesBaseService<T extends AHumanResourcesBaseEn
 
         getRepository().save(entityUpdate);
     }
-
-    /**
-     * Hard deletes an entity.
-     *
-     * @param entity The entity to hard delete.
-     * @throws Exception If an error occurs while deleting the entity.
-     */
-    @Override
-    public void hardDelete(T entity) throws Exception {
-        getRepository().delete(entity);
-    }
 }

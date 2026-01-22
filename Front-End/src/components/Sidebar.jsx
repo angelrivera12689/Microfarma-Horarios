@@ -42,11 +42,9 @@ const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
       name: 'Horarios',
       icon: '📅',
       items: [
-        { name: 'Horarios', path: 'schedules/schedules', icon: '📅' },
-        { name: 'Calendarios', path: 'schedules/calendars' },
         { name: 'Tipos de Turno', path: 'schedules/shifttypes' },
         { name: 'Turnos', path: 'schedules/shifts' },
-        { name: 'Solicitudes de Cambio', path: 'schedules/shift-change-requests' }
+        { name: 'Reportes', path: 'schedules/reports' }
       ]
     },
     {

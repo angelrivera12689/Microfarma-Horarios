@@ -15,8 +15,6 @@ const UserLanding = () => {
     shiftsByType: {}
   });
 
-  const isEmployeeOrAdmin = user?.role === 'EMPLOYEE' || user?.role === 'ADMIN';
-
   useEffect(() => {
     const fetchShifts = async () => {
       try {
@@ -42,6 +40,10 @@ const UserLanding = () => {
 
   const handleViewSchedules = () => {
     navigate('/my-schedule');
+  };
+
+  const handleGoToDashboard = () => {
+    navigate('/dashboard');
   };
 
   const calculateStats = (shiftList) => {
@@ -143,70 +145,45 @@ const UserLanding = () => {
         </div>
 
         {/* Statistics Cards */}
-        {isEmployeeOrAdmin && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-              <div className="text-2xl font-bold text-blue-600">{stats.totalShifts}</div>
-              <div className="text-sm text-gray-600">Total Turnos</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-              <div className="text-2xl font-bold text-green-600">{stats.upcomingShifts}</div>
-              <div className="text-sm text-gray-600">Próximos</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-              <div className="text-2xl font-bold text-purple-600">{stats.totalHours}h</div>
-              <div className="text-sm text-gray-600">Horas Totales</div>
-            </div>
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
-              <div className="text-2xl font-bold text-orange-600">{Object.keys(stats.shiftsByType).length}</div>
-              <div className="text-sm text-gray-600">Tipos de Turno</div>
-            </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
+            <div className="text-2xl font-bold text-blue-600">{stats.totalShifts}</div>
+            <div className="text-sm text-gray-600">Total Turnos</div>
           </div>
-        )}
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
+            <div className="text-2xl font-bold text-green-600">{stats.upcomingShifts}</div>
+            <div className="text-sm text-gray-600">Próximos</div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
+            <div className="text-2xl font-bold text-purple-600">{stats.totalHours}h</div>
+            <div className="text-sm text-gray-600">Horas Totales</div>
+          </div>
+          <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-center">
+            <div className="text-2xl font-bold text-orange-600">{Object.keys(stats.shiftsByType).length}</div>
+            <div className="text-sm text-gray-600">Tipos de Turno</div>
+          </div>
+        </div>
 
         {/* Features Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-          {isEmployeeOrAdmin && (
-            <>
-              {/* Schedule Card */}
-              <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mb-6 mx-auto">
-                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">Mis Turnos</h3>
-                <p className="text-gray-600 text-center mb-6">
-                  Consulta tus turnos asignados y planifica tu semana.
-                </p>
-                <button
-                  onClick={handleViewSchedules}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Ver Turnos Asignados
-                </button>
-              </div>
-
-              {/* Shift Change Requests Card */}
-              <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
-                <div className="w-16 h-16 bg-orange-50 rounded-xl flex items-center justify-center mb-6 mx-auto">
-                  <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">Solicitudes de Cambio</h3>
-                <p className="text-gray-600 text-center mb-6">
-                  Solicita cambios en tus turnos y revisa el estado de tus peticiones.
-                </p>
-                <button
-                  onClick={() => navigate('/shift-change-requests')}
-                  className="w-full bg-orange-600 hover:bg-orange-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200"
-                >
-                  Gestionar Solicitudes
-                </button>
-              </div>
-            </>
-          )}
+          {/* Schedule Card */}
+          <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+            <div className="w-16 h-16 bg-blue-50 rounded-xl flex items-center justify-center mb-6 mx-auto">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3 text-center">Mis Turnos</h3>
+            <p className="text-gray-600 text-center mb-6">
+              Consulta tus turnos asignados y planifica tu semana.
+            </p>
+            <button
+              onClick={handleViewSchedules}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200"
+            >
+              Ver Turnos Asignados
+            </button>
+          </div>
 
           {/* Profile Card */}
           <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
@@ -247,112 +224,108 @@ const UserLanding = () => {
           </div>
         </div>
 
-        {isEmployeeOrAdmin && (
-          <>
-            {/* Reminders Section */}
-            <div className="bg-yellow-50 rounded-xl p-6 shadow-sm border border-yellow-200 mb-8">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                Recordatorios
-              </h3>
-              {stats.upcomingShifts > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-700">
-                    Tienes <span className="font-semibold text-yellow-700">{stats.upcomingShifts}</span> turnos próximos esta semana.
-                  </p>
-                  {shifts.slice(0, 3).filter(shift => {
-                    const [year, month, day] = shift.date.split('-');
-                    const shiftDate = new Date(year, month - 1, day);
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const weekFromNow = new Date(today);
-                    weekFromNow.setDate(today.getDate() + 7);
-                    return shiftDate >= today && shiftDate <= weekFromNow;
-                  }).map((shift) => (
-                    <div key={shift.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-yellow-200">
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">
-                          {(() => {
-                            const [year, month, day] = shift.date.split('-');
-                            const date = new Date(year, month - 1, day);
-                            return date.toLocaleDateString('es-ES', {
-                              weekday: 'short',
-                              month: 'short',
-                              day: 'numeric'
-                            });
-                          })()}
-                        </p>
-                        <p className="text-xs text-gray-600">
-                          {shift.shiftType?.name} - {shift.location?.name}
-                        </p>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {shift.shiftType?.startTime?.substring(0, 5)}
-                      </div>
-                    </div>
-                  ))}
+        {/* Reminders Section */}
+        <div className="bg-yellow-50 rounded-xl p-6 shadow-sm border border-yellow-200 mb-8">
+          <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+            <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            Recordatorios
+          </h3>
+          {stats.upcomingShifts > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-700">
+                Tienes <span className="font-semibold text-yellow-700">{stats.upcomingShifts}</span> turnos próximos esta semana.
+              </p>
+              {shifts.slice(0, 3).filter(shift => {
+                const [year, month, day] = shift.date.split('-');
+                const shiftDate = new Date(year, month - 1, day);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const weekFromNow = new Date(today);
+                weekFromNow.setDate(today.getDate() + 7);
+                return shiftDate >= today && shiftDate <= weekFromNow;
+              }).map((shift) => (
+                <div key={shift.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-yellow-200">
+                  <div>
+                    <p className="font-medium text-gray-900 text-sm">
+                      {(() => {
+                        const [year, month, day] = shift.date.split('-');
+                        const date = new Date(year, month - 1, day);
+                        return date.toLocaleDateString('es-ES', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric'
+                        });
+                      })()}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {shift.shiftType?.name} - {shift.location?.name}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {shift.shiftType?.startTime?.substring(0, 5)}
+                  </div>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-600">No tienes turnos próximos esta semana.</p>
-              )}
+              ))}
             </div>
+          ) : (
+            <p className="text-sm text-gray-600">No tienes turnos próximos esta semana.</p>
+          )}
+        </div>
 
-            {/* Shifts Summary */}
-            <div id="shifts-section" className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Mis Turnos</h3>
-              {loading ? (
-                <div className="text-center text-gray-500">Cargando turnos...</div>
-              ) : shifts.length === 0 ? (
-                <div className="text-center text-gray-500">No tienes turnos asignados</div>
-              ) : (
-                <div className="space-y-4">
-                  {shifts.slice(0, 5).map((shift) => (
-                    <div key={shift.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-semibold text-gray-900">
-                          {(() => {
-                            const [year, month, day] = shift.date.split('-');
-                            const date = new Date(year, month - 1, day);
-                            return date.toLocaleDateString('es-ES', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            });
-                          })()}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {shift.shiftType?.name} - {shift.location?.name}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {shift.shiftType?.startTime?.substring(0, 5)} - {shift.shiftType?.endTime?.substring(0, 5)}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Asignado
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {shifts.length > 5 && (
-                    <div className="text-center">
-                      <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); navigate('/my-schedule'); }}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Ver todos los turnos ({shifts.length})
-                      </button>
-                    </div>
-                  )}
+        {/* Shifts Summary */}
+        <div id="shifts-section" className="bg-white rounded-xl p-8 shadow-sm border border-gray-200">
+          <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Mis Turnos</h3>
+          {loading ? (
+            <div className="text-center text-gray-500">Cargando turnos...</div>
+          ) : shifts.length === 0 ? (
+            <div className="text-center text-gray-500">No tienes turnos asignados</div>
+          ) : (
+            <div className="space-y-4">
+              {shifts.slice(0, 5).map((shift) => (
+                <div key={shift.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-semibold text-gray-900">
+                      {(() => {
+                        const [year, month, day] = shift.date.split('-');
+                        const date = new Date(year, month - 1, day);
+                        return date.toLocaleDateString('es-ES', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                      })()}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {shift.shiftType?.name} - {shift.location?.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {shift.shiftType?.startTime?.substring(0, 5)} - {shift.shiftType?.endTime?.substring(0, 5)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      Asignado
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {shifts.length > 5 && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); navigate('/my-schedule'); }}
+                    className="text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Ver todos los turnos ({shifts.length})
+                  </button>
                 </div>
               )}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

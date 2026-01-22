@@ -17,46 +17,19 @@ import org.springframework.web.bind.annotation.RestController;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
-import MicrofarmaHorarios.Security.IService.ISecurityUserService;
-import MicrofarmaHorarios.Security.Entity.User;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/humanresources/employees")
-@PreAuthorize("hasRole('EMPLOYEE') or hasRole('ADMIN')")
+@PreAuthorize("hasRole('ADMIN')")
 public class HumanResourcesEmployeeController extends AHumanResourcesBaseController<Employee, IHumanResourcesEmployeeService> {
 
     @Autowired
     private IHumanResourcesEmployeeService employeeService;
 
-    @Autowired
-    private ISecurityUserService userService;
-
     public HumanResourcesEmployeeController(IHumanResourcesEmployeeService service) {
         super(service, "Employee");
-    }
-
-    @Override
-    public ResponseEntity<ApiResponseDto<List<Employee>>> findByStateTrue() {
-        try {
-            List<Employee> allEmployees = employeeService.findByStateTrue();
-            // Filter to only employees linked to users with EMPLOYEE role
-            List<Employee> filteredEmployees = allEmployees.stream()
-                .filter(employee -> {
-                    if (employee.getUser() != null) {
-                        User user = employee.getUser();
-                        return user.getRole() != null && "EMPLOYEE".equals(user.getRole().getName());
-                    }
-                    return false;
-                })
-                .collect(Collectors.toList());
-            return ResponseEntity.ok(new ApiResponseDto<List<Employee>>("Empleados obtenidos", filteredEmployees, true));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(new ApiResponseDto<List<Employee>>(e.getMessage(), null, false));
-        }
     }
 
     @GetMapping("/email/{email}")

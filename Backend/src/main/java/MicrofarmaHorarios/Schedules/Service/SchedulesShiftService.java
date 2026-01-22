@@ -53,6 +53,12 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
 
     @Override
     public Shift save(Shift entity) throws Exception {
+        // Validate that the employee has EMPLOYEE role
+        if (entity.getEmployee() != null && entity.getEmployee().getUser() != null) {
+            if (!"EMPLOYEE".equals(entity.getEmployee().getUser().getRole().getName())) {
+                throw new Exception("Cannot assign shift to user without EMPLOYEE role");
+            }
+        }
         Shift savedShift = super.save(entity);
         try {
             emailService.sendShiftAssignmentEmail(savedShift);
