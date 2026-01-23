@@ -36,11 +36,11 @@ public class NotificationScheduler {
                 try {
                     emailService.sendShiftReminderEmail(shift);
                 } catch (Exception e) {
-                    System.err.println("Error sending reminder for shift " + shift.getId() + ": " + e.getMessage());
+                    // Log error but continue
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error in shift reminder scheduler: " + e.getMessage());
+            // Log error but continue
         }
     }
 
@@ -58,12 +58,12 @@ public class NotificationScheduler {
                     try {
                         emailService.sendBirthdayEmail(employee);
                     } catch (Exception e) {
-                        System.err.println("Error sending birthday email to " + employee.getEmail() + ": " + e.getMessage());
+                        // Log error but continue
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error in birthday email scheduler: " + e.getMessage());
+            // Log error but continue
         }
     }
 
@@ -82,12 +82,12 @@ public class NotificationScheduler {
                         // You can create a specific method for work anniversary or reuse birthday email
                         emailService.sendBirthdayEmail(employee); // Reuse for now
                     } catch (Exception e) {
-                        System.err.println("Error sending anniversary email to " + employee.getEmail() + ": " + e.getMessage());
+                        // Log error but continue
                     }
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error in work anniversary email scheduler: " + e.getMessage());
+            // Log error but continue
         }
     }
 }

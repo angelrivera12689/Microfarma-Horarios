@@ -33,8 +33,7 @@ class DashboardService {
         notifications,
         weeklySchedule
       };
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+    } catch {
       // Return default values in case of error
       return {
         activeUsers: 0,

@@ -16,9 +16,7 @@ const Permissions = () => {
 
   useEffect(() => {
     const user = authService.getCurrentUser();
-    console.log('Current user:', user);
     if (!user || user.role !== 'ADMIN') {
-      console.error('User is not admin or not logged in');
       alert('Debes iniciar sesión como administrador para acceder a esta página');
       return;
     }
@@ -31,11 +29,9 @@ const Permissions = () => {
       if (response.status) {
         setPermissions(response.data || []);
       } else {
-        console.error('Failed to load permissions:', response.message);
         alert('Error al cargar permisos: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading permissions:', error);
+    } catch {
       alert('Error de conexión al cargar permisos');
     } finally {
       setLoading(false);
@@ -65,8 +61,7 @@ const Permissions = () => {
       try {
         await permissionService.deletePermission(permission.id);
         await loadPermissions();
-      } catch (error) {
-        console.error('Error deleting permission:', error);
+      } catch {
         alert('Error al eliminar el permiso');
       }
     }
@@ -89,8 +84,7 @@ const Permissions = () => {
 
       setModalOpen(false);
       await loadPermissions();
-    } catch (error) {
-      console.error('Error saving permission:', error);
+    } catch {
       alert('Error al guardar el permiso');
     }
   };

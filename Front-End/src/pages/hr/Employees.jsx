@@ -36,11 +36,9 @@ const Employees = () => {
       if (response.data) {
         setEmployees(Array.isArray(response.data) ? response.data : []);
       } else {
-        console.error('Failed to load employees:', response.message);
         alert('Error al cargar empleados: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading employees:', error);
+    } catch {
       alert('Error de conexión al cargar empleados');
     } finally {
       setLoading(false);
@@ -52,11 +50,9 @@ const Employees = () => {
       const response = await positionService.getAllPositions();
       if (response.data) {
         setPositions(Array.isArray(response.data) ? response.data : []);
-      } else {
-        console.error('Failed to load positions:', response.message);
       }
-    } catch (error) {
-      console.error('Error loading positions:', error);
+    } catch {
+      // Silently handle error
     }
   };
 
@@ -65,11 +61,9 @@ const Employees = () => {
       const response = await contractTypeService.getAllContractTypes();
       if (response.data) {
         setContractTypes(Array.isArray(response.data) ? response.data : []);
-      } else {
-        console.error('Failed to load contract types:', response.message);
       }
-    } catch (error) {
-      console.error('Error loading contract types:', error);
+    } catch {
+      // Silently handle error
     }
   };
 
@@ -110,8 +104,7 @@ const Employees = () => {
       try {
         await employeeService.deleteEmployee(employee.id);
         await loadEmployees();
-      } catch (error) {
-        console.error('Error deleting employee:', error);
+      } catch {
         alert('Error al eliminar el empleado');
       }
     }
@@ -141,8 +134,7 @@ const Employees = () => {
 
       setModalOpen(false);
       await loadEmployees();
-    } catch (error) {
-      console.error('Error saving employee:', error);
+    } catch {
       alert('Error al guardar el empleado');
     }
   };

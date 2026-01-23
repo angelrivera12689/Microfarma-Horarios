@@ -50,10 +50,9 @@ class AuthService {
 
   async logout() {
     try {
-      const response = await apiClient.post('/api/auth/logout');
-      console.log('Logout response:', response);
-    } catch (error) {
-      console.error('Logout error:', error);
+      await apiClient.post('/api/auth/logout');
+    } catch {
+      // Silently handle logout error
     } finally {
       // Clear local storage regardless of API call success
       localStorage.removeItem('token');

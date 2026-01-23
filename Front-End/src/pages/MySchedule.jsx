@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import shiftService from '../services/shiftService';
-import authService from '../services/authService';
 
 const MySchedule = () => {
-  const user = authService.getCurrentUser();
-  const navigate = useNavigate();
   const [shifts, setShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

@@ -22,48 +22,45 @@ class ApiClient {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    try {
-      const response = await fetch(url, config);
+    const response = await fetch(url, config);
 
-      // Handle blob responses for file downloads
-      if (options.responseType === 'blob') {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return await response.blob();
+    // Handle blob responses for file downloads
+    if (options.responseType === 'blob') {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      return await response.blob();
+    }
 
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      let data;
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    let data;
 
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      // Handle non-JSON responses
+      if (response.ok) {
+        data = { success: true, data: await response.text() };
       } else {
-        // Handle non-JSON responses (like HTML error pages)
-        const text = await response.text();
         data = {
           success: false,
           message: 'Error del servidor',
           data: null
         };
-        console.error('Non-JSON response:', text.substring(0, 200));
       }
-
-      if (!response.ok) {
-        // Return a consistent error response
-        return {
-          success: false,
-          message: data.message || 'Error del servidor',
-          data: null
-        };
-      }
-
-      return data;
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
     }
+
+    if (!response.ok) {
+      // Return a consistent error response
+      return {
+        success: false,
+        message: data.message || 'Error del servidor',
+        data: null
+      };
+    }
+
+    return data;
   }
 
   get(endpoint, options = {}) {

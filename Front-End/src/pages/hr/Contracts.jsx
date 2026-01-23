@@ -24,11 +24,9 @@ const Contracts = () => {
       if (response.data) {
         setContractTypes(Array.isArray(response.data) ? response.data : []);
       } else {
-        console.error('Failed to load contract types:', response.message);
         alert('Error al cargar tipos de contrato: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading contract types:', error);
+    } catch {
       alert('Error de conexión al cargar tipos de contrato');
     } finally {
       setLoading(false);
@@ -60,8 +58,7 @@ const Contracts = () => {
       try {
         await contractTypeService.deleteContractType(contractType.id);
         await loadContractTypes();
-      } catch (error) {
-        console.error('Error deleting contract type:', error);
+      } catch {
         alert('Error al eliminar el tipo de contrato');
       }
     }
@@ -85,8 +82,7 @@ const Contracts = () => {
 
       setModalOpen(false);
       await loadContractTypes();
-    } catch (error) {
-      console.error('Error saving contract type:', error);
+    } catch {
       alert('Error al guardar el tipo de contrato');
     }
   };

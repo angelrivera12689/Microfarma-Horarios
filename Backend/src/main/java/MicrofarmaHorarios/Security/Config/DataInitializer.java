@@ -38,7 +38,6 @@ public class DataInitializer implements CommandLineRunner {
             Role role = new Role();
             role.setName(roleName);
             roleService.save(role);
-            System.out.println("Role " + roleName + " created successfully");
         }
     }
 
@@ -54,7 +53,6 @@ public class DataInitializer implements CommandLineRunner {
             adminUser.setRole(adminRole);
 
             userService.save(adminUser);
-            System.out.println("Default admin user created: admin@microfarma.com / admin123");
         }
     }
 }

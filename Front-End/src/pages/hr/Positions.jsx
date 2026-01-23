@@ -24,11 +24,9 @@ const Positions = () => {
       if (response.data) {
         setPositions(Array.isArray(response.data) ? response.data : []);
       } else {
-        console.error('Failed to load positions:', response.message);
         alert('Error al cargar posiciones: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading positions:', error);
+    } catch {
       alert('Error de conexión al cargar posiciones');
     } finally {
       setLoading(false);
@@ -60,8 +58,7 @@ const Positions = () => {
       try {
         await positionService.deletePosition(position.id);
         await loadPositions();
-      } catch (error) {
-        console.error('Error deleting position:', error);
+      } catch {
         alert('Error al eliminar la posición');
       }
     }
@@ -85,8 +82,7 @@ const Positions = () => {
 
       setModalOpen(false);
       await loadPositions();
-    } catch (error) {
-      console.error('Error saving position:', error);
+    } catch {
       alert('Error al guardar la posición');
     }
   };

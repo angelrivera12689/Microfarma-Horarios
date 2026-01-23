@@ -20,9 +20,7 @@ const Roles = () => {
 
   useEffect(() => {
     const user = authService.getCurrentUser();
-    console.log('Current user:', user);
     if (!user || user.role !== 'ADMIN') {
-      console.error('User is not admin or not logged in');
       alert('Debes iniciar sesión como administrador para acceder a esta página');
       return;
     }
@@ -36,11 +34,9 @@ const Roles = () => {
       if (response.status) {
         setRoles(response.data || []);
       } else {
-        console.error('Failed to load roles:', response.message);
         alert('Error al cargar roles: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading roles:', error);
+    } catch {
       alert('Error de conexión al cargar roles');
     } finally {
       setLoading(false);
@@ -53,10 +49,10 @@ const Roles = () => {
       if (response.status) {
         setPermissions(response.data || []);
       } else {
-        console.error('Failed to load permissions:', response.message);
+        // Failed to load permissions
       }
-    } catch (error) {
-      console.error('Error loading permissions:', error);
+    } catch {
+      // Error loading permissions
     }
   };
 
@@ -85,8 +81,7 @@ const Roles = () => {
       } else {
         setRolePermissions([]);
       }
-    } catch (error) {
-      console.error('Error loading role permissions:', error);
+    } catch {
       setRolePermissions([]);
     }
     setPermissionsModalOpen(true);
@@ -106,8 +101,7 @@ const Roles = () => {
       if (response.status) {
         setRolePermissions(response.data || []);
       }
-    } catch (error) {
-      console.error('Error updating permission:', error);
+    } catch {
       alert('Error al actualizar el permiso');
     }
   };
@@ -117,8 +111,7 @@ const Roles = () => {
       try {
         await roleService.deleteRole(role.id);
         await loadRoles();
-      } catch (error) {
-        console.error('Error deleting role:', error);
+      } catch {
         alert('Error al eliminar el rol');
       }
     }
@@ -140,8 +133,7 @@ const Roles = () => {
 
       setModalOpen(false);
       await loadRoles();
-    } catch (error) {
-      console.error('Error saving role:', error);
+    } catch {
       alert('Error al guardar el rol');
     }
   };

@@ -20,9 +20,7 @@ const Users = () => {
 
   useEffect(() => {
     const user = authService.getCurrentUser();
-    console.log('Current user:', user);
     if (!user || user.role !== 'ADMIN') {
-      console.error('User is not admin or not logged in');
       alert('Debes iniciar sesión como administrador para acceder a esta página');
       return;
     }
@@ -36,11 +34,9 @@ const Users = () => {
       if (response.status) {
         setUsers(response.data || []);
       } else {
-        console.error('Failed to load users:', response.message);
         alert('Error al cargar usuarios: ' + (response.message || 'Error desconocido'));
       }
-    } catch (error) {
-      console.error('Error loading users:', error);
+    } catch {
       alert('Error de conexión al cargar usuarios');
     } finally {
       setLoading(false);
@@ -53,10 +49,10 @@ const Users = () => {
       if (response.status) {
         setRoles(response.data || []);
       } else {
-        console.error('Failed to load roles:', response.message);
+        // Failed to load roles
       }
-    } catch (error) {
-      console.error('Error loading roles:', error);
+    } catch {
+      // Error loading roles
     }
   };
 
@@ -87,8 +83,7 @@ const Users = () => {
       try {
         await userService.deleteUser(user.id);
         await loadUsers();
-      } catch (error) {
-        console.error('Error deleting user:', error);
+      } catch {
         alert('Error al eliminar el usuario');
       }
     }
@@ -113,8 +108,7 @@ const Users = () => {
 
       setModalOpen(false);
       await loadUsers();
-    } catch (error) {
-      console.error('Error saving user:', error);
+    } catch {
       alert('Error al guardar el usuario');
     }
   };

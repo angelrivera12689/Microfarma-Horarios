@@ -13,7 +13,6 @@ import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService
 import MicrofarmaHorarios.Notification.Service.EmailService;
 import MicrofarmaHorarios.Security.IService.ISecurityUserService;
 import MicrofarmaHorarios.Security.Entity.User;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Employee> implements IHumanResourcesEmployeeService {
@@ -60,14 +59,12 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
             }
         } catch (Exception e) {
             // Log but don't fail
-            System.err.println("Error associating Employee with User: " + e.getMessage());
         }
 
         try {
             emailService.sendWelcomeEmail(savedEmployee);
         } catch (Exception e) {
             // Log error but don't fail the save operation
-            System.err.println("Error sending welcome email: " + e.getMessage());
         }
         return savedEmployee;
     }

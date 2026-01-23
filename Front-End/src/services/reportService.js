@@ -19,7 +19,6 @@ class ReportService {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting CSV:', error);
       alert('Error al descargar CSV: ' + (error.message || 'Error desconocido'));
     }
   }
@@ -38,7 +37,6 @@ class ReportService {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting PDF:', error);
       alert('Error al descargar PDF: ' + (error.message || 'Error desconocido'));
     }
   }

@@ -111,8 +111,7 @@ public class SchedulesReportService implements ISchedulesReportService {
             boolean isHoliday = holidayService.isHoliday(shift.getDate());
             boolean isSpecialDay = isSunday || isHoliday;
 
-            // Debug logging
-            System.out.println("Shift date: " + shift.getDate() + ", isSunday: " + isSunday + ", isHoliday: " + isHoliday + ", hours: " + hours);
+            // Debug logging removed
 
             double regularHoursPerDay = 8.0;
             double regularForThisShift = Math.min(hours, regularHoursPerDay);

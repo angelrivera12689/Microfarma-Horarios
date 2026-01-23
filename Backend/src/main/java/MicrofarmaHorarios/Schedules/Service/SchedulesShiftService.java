@@ -64,7 +64,6 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
             emailService.sendShiftAssignmentEmail(savedShift);
         } catch (Exception e) {
             // Log error but don't fail the save operation
-            System.err.println("Error sending shift assignment email: " + e.getMessage());
         }
         return savedShift;
     }

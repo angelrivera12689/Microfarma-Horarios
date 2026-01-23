@@ -45,14 +45,8 @@ public class UserControllerSecurity extends ASecurityBaseController<User, ISecur
     public ResponseEntity<ApiResponseDto<List<User>>> findByStateTrue() {
         try {
             List<User> users = service.findByStateTrue();
-            System.out.println("Users found: " + users.size());
-            for (User u : users) {
-                System.out.println("User: " + u.getEmail() + " - Active: " + u.getActive());
-            }
             return ResponseEntity.ok(new ApiResponseDto<List<User>>("Datos obtenidos", users, true));
         } catch (Exception e) {
-            System.out.println("Error finding users: " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.internalServerError().body(new ApiResponseDto<List<User>>(e.getMessage(), null, false));
         }
     }

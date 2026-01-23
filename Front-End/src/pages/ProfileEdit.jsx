@@ -1,12 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import employeeService from '../services/employeeService';
-import authService from '../services/authService';
 
 const ProfileEdit = () => {
   const navigate = useNavigate();
-  const user = authService.getCurrentUser();
-  const [employee, setEmployee] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
@@ -23,7 +20,6 @@ const ProfileEdit = () => {
         const response = await employeeService.getMyProfile();
         if (response.status && response.data) {
           const emp = response.data;
-          setEmployee(emp);
           setFormData({
             firstName: emp.firstName || '',
             lastName: emp.lastName || '',

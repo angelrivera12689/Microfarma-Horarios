@@ -60,7 +60,6 @@ public class UserServiceSecurity extends ASecurityBaseService<User> implements I
                 }
             } catch (Exception e) {
                 // Log but don't fail
-                System.err.println("Error creating or associating Employee: " + e.getMessage());
             }
         } else {
             // Associate with existing Employee if email matches
@@ -75,7 +74,6 @@ public class UserServiceSecurity extends ASecurityBaseService<User> implements I
                 }
             } catch (Exception e) {
                 // Log but don't fail
-                System.err.println("Error associating User with Employee: " + e.getMessage());
             }
         }
 
