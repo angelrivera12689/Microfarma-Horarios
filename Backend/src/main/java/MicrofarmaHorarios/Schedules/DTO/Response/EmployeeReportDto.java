@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EmployeeReportDto {
+    private String employeeId;
     private String fullName;
     private Double dailyAvgHours;
     private Double weeklyTotalHours;
@@ -22,4 +23,7 @@ public class EmployeeReportDto {
     private Double nocturnaExtraHours;
     private Double dominicalHours;
     private Double festivoHours;
+
+    // Número de turnos trabajados
+    private Integer totalShifts;
 }

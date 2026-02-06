@@ -3,6 +3,7 @@ package MicrofarmaHorarios.Schedules.Service;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +27,10 @@ import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftRepository;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesShiftService;
 import MicrofarmaHorarios.Notification.Service.EmailService;
 import MicrofarmaHorarios.Security.IService.ISecurityUserService;
+import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
+import MicrofarmaHorarios.HumanResources.Entity.Employee;
+import MicrofarmaHorarios.Organization.IService.IOrganizationLocationService;
+import MicrofarmaHorarios.Organization.Entity.Location;
 
 @Service
 public class SchedulesShiftService extends ASchedulesBaseService<Shift> implements ISchedulesShiftService {
@@ -38,6 +43,12 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
 
     @Autowired
     private ISecurityUserService userService;
+
+    @Autowired
+    private IHumanResourcesEmployeeService employeeService;
+
+    @Autowired
+    private IOrganizationLocationService locationService;
 
     @Override
     protected ISchedulesBaseRepository<Shift, String> getRepository() {
@@ -265,18 +276,47 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
     }
 
     @Override
-    public byte[] generateCalendarPdf(int year, int month, String locationId) throws Exception {
+    public byte[] generateCalendarPdf(int year, int month, String locationId, String employeeId) throws Exception {
         try {
             LocalDate startDate = LocalDate.of(year, month, 1);
             LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-            List<Shift> shifts = findByDateBetween(startDate, endDate);
-            if (!locationId.isEmpty()) {
+            List<Shift> shifts = findByDateBetween(startDate, endDate).stream()
+                .filter(s -> s.getEmployee() != null)
+                .toList();
+            if (locationId != null && !locationId.isEmpty()) {
                 shifts = shifts.stream().filter(s -> s.getLocation().getId().equals(locationId)).toList();
             }
+            if (employeeId != null && !employeeId.isEmpty()) {
+                shifts = shifts.stream().filter(s -> s.getEmployee().getId().equals(employeeId)).toList();
+            }
 
-            String locationName = locationId;
-            if (!shifts.isEmpty()) {
-                locationName = shifts.get(0).getLocation().getName();
+            String locationName = "";
+            if (locationId != null && !locationId.isEmpty()) {
+                try {
+                    Optional<Location> locOpt = locationService.findById(locationId);
+                    if (locOpt.isPresent()) {
+                        locationName = locOpt.get().getName();
+                    } else {
+                        locationName = "Sede no encontrada";
+                    }
+                } catch (Exception e) {
+                    locationName = "Sede no encontrada";
+                }
+            }
+            String headerTitle = "";
+            if (employeeId != null && !employeeId.isEmpty()) {
+                try {
+                    Optional<Employee> empOpt = employeeService.findById(employeeId);
+                    if (empOpt.isPresent()) {
+                        Employee emp = empOpt.get();
+                        headerTitle = emp.getFirstName() + " " + emp.getLastName();
+                    } else {
+                        headerTitle = "Empleado no encontrado";
+                    }
+                } catch (Exception e) {
+                    // Handle exception, perhaps log or set default
+                    headerTitle = "Empleado no encontrado";
+                }
             }
 
             // Define EMS colors
@@ -286,12 +326,38 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
             Color white = new DeviceRgb(255, 255, 255); // White
             Color lightGray = new DeviceRgb(243, 244, 246); // Light gray
 
+            String[] months = {"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             PdfWriter writer = new PdfWriter(baos);
             PdfDocument pdfDoc = new PdfDocument(writer);
             pdfDoc.setDefaultPageSize(PageSize.LETTER);
             Document document = new Document(pdfDoc);
             document.setMargins(36, 36, 36, 36); // 0.5 inch margins
+
+            // Title
+            String mainTitle = "Calendario General";
+            if (employeeId != null && !employeeId.isEmpty()) {
+                mainTitle = "Empleado: " + headerTitle;
+            } else if (locationId != null && !locationId.isEmpty()) {
+                mainTitle = "Sede: " + locationName;
+            }
+            Paragraph title = new Paragraph(mainTitle)
+                .setFontSize(28)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(darkRed)
+                .setBold()
+                .setMarginBottom(10);
+            document.add(title);
+
+            // Subtitle
+            Paragraph subtitle = new Paragraph("Calendario de Turnos - " + months[month - 1] + " " + year)
+                .setFontSize(16)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(ColorConstants.GRAY)
+                .setMarginBottom(20);
+            document.add(subtitle);
 
             // Header with pharmacy branding
             Table headerTable = new Table(new float[]{1});
@@ -300,40 +366,40 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
 
             Cell headerCell = new Cell()
                 .setBackgroundColor(emsRed)
-                .setPadding(15);
-            if (!locationId.isEmpty()) {
-                headerCell.add(new Paragraph(locationName)
-                    .setFontSize(24)
-                    .setFontColor(white)
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setBold()
-                    .setMarginTop(5));
-            } else {
-                headerCell.add(new Paragraph("Sede")
-                    .setFontSize(24)
-                    .setFontColor(white)
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setBold()
-                    .setMarginTop(5));
-            }
-            headerCell.add(new Paragraph("Calendario de Turnos")
-                .setFontSize(16)
+                .setPadding(10);
+            headerCell.add(new Paragraph("Microfarma Horarios")
+                .setFontSize(20)
+                .setFontColor(white)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBold());
+            headerCell.add(new Paragraph("Sistema de Gestión de Horarios Laborales")
+                .setFontSize(12)
                 .setFontColor(white)
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(5));
             headerTable.addCell(headerCell);
             document.add(headerTable);
 
-            // Month/Year title
-            String[] months = {"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-                              "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
-            Paragraph monthTitle = new Paragraph(months[month - 1] + " " + year)
-                .setFontSize(20)
-                .setFontColor(darkRed)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setBold()
-                .setMarginBottom(15);
-            document.add(monthTitle);
+            // If no shifts, add a message
+            if (shifts.isEmpty()) {
+                String message = "No hay turnos programados";
+                if (employeeId != null && !employeeId.isEmpty()) {
+                    message += " para este empleado";
+                } else if (locationId != null && !locationId.isEmpty()) {
+                    message += " para esta sede";
+                }
+                message += " en el mes de " + months[month - 1] + " " + year + ".";
+                Paragraph noShiftsMessage = new Paragraph(message)
+                    .setFontSize(14)
+                    .setFontColor(ColorConstants.GRAY)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setItalic()
+                    .setMarginTop(50)
+                    .setMarginBottom(50);
+                document.add(noShiftsMessage);
+                document.close();
+                return baos.toByteArray();
+            }
 
             // Create calendar table
             float[] columnWidths = {1, 1, 1, 1, 1, 1, 1};

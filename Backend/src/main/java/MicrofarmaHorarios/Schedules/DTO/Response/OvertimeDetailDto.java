@@ -12,4 +12,5 @@ public class OvertimeDetailDto {
     private LocalDate date;
     private Double hours;
     private String justification;
+    private String location;
 }

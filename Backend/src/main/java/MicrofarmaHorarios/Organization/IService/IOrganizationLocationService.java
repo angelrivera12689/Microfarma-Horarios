@@ -8,4 +8,6 @@ public interface IOrganizationLocationService extends IOrganizationBaseService<L
 
     List<Location> findByCompanyId(String companyId) throws Exception;
 
+    java.util.Optional<Location> findByName(String name) throws Exception;
+
 }

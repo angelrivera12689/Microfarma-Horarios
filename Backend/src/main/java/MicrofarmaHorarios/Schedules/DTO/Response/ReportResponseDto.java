@@ -10,5 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ReportResponseDto {
     private GlobalReportDto global;
+    private List<LocationReportDto> locations;
     private List<EmployeeReportDto> employees;
 }

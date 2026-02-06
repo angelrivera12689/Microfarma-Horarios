@@ -23,19 +23,22 @@ class ReportService {
     }
   }
 
-  async exportPdf(month, year) {
+  async exportPdf(month, year, locationName = null, employeeId = null) {
     try {
-      const blob = await apiClient.get(`/api/schedules/reports/monthly/pdf?month=${month}&year=${year}`, {
+      let url = `/api/schedules/reports/monthly/pdf?month=${month}&year=${year}`;
+      if (locationName) url += `&locationName=${encodeURIComponent(locationName)}`;
+      if (employeeId) url += `&employeeId=${employeeId}`;
+      const blob = await apiClient.get(url, {
         responseType: 'blob'
       });
-      const url = window.URL.createObjectURL(blob);
+      const urlObj = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = urlObj;
       link.setAttribute('download', `reporte_horas_${year}_${month}.pdf`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(urlObj);
     } catch (error) {
       alert('Error al descargar PDF: ' + (error.message || 'Error desconocido'));
     }

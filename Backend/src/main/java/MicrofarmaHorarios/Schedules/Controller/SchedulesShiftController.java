@@ -76,13 +76,23 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
         }
     }
 
-    @GetMapping("/pdf/{year}/{month}/{locationId}")
-    public ResponseEntity<byte[]> generateCalendarPdf(@PathVariable int year, @PathVariable int month, @PathVariable String locationId) {
+    @GetMapping("/pdf/{year}/{month}")
+    public ResponseEntity<byte[]> generateCalendarPdf(@PathVariable int year, @PathVariable int month,
+            @RequestParam(required = false) String locationId,
+            @RequestParam(required = false) String employeeId) {
         try {
-            byte[] pdfBytes = service.generateCalendarPdf(year, month, locationId);
+            byte[] pdfBytes = service.generateCalendarPdf(year, month, locationId, employeeId);
+            String filename = "calendario_turnos_" + year + "_" + String.format("%02d", month);
+            if (locationId != null && !locationId.isEmpty()) {
+                filename += "_sede";
+            }
+            if (employeeId != null && !employeeId.isEmpty()) {
+                filename += "_empleado";
+            }
+            filename += ".pdf";
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
-            headers.setContentDispositionFormData("attachment", "calendario_turnos_" + year + "_" + String.format("%02d", month) + ".pdf");
+            headers.setContentDispositionFormData("attachment", filename);
             headers.setContentLength(pdfBytes.length);
             return ResponseEntity.ok().headers(headers).body(pdfBytes);
         } catch (Exception e) {

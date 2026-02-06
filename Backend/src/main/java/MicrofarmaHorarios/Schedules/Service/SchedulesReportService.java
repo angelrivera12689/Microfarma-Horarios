@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import MicrofarmaHorarios.Schedules.DTO.Response.EmployeeReportDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.GlobalReportDto;
+import MicrofarmaHorarios.Schedules.DTO.Response.LocationReportDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.OvertimeDetailDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
@@ -40,11 +42,11 @@ public class SchedulesReportService implements ISchedulesReportService {
                 .filter(shift -> shift.getStatus() != null && shift.getStatus() && shift.getEmployee() != null && shift.getShiftType() != null)
                 .collect(Collectors.toList());
 
-        Map<String, List<Shift>> shiftsByEmployee = shifts.stream()
-                .filter(shift -> shift.getEmployee().getId() != null)
-                .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId()));
+        Map<String, List<Shift>> shiftsByLocation = shifts.stream()
+                .filter(shift -> shift.getLocation().getId() != null)
+                .collect(Collectors.groupingBy(shift -> shift.getLocation().getId()));
 
-        List<EmployeeReportDto> employeeReports = new ArrayList<>();
+        List<LocationReportDto> locationReports = new ArrayList<>();
         double globalTotalHours = 0;
         double globalTotalOvertime = 0;
         double globalRegularHours = 0;
@@ -52,6 +54,113 @@ public class SchedulesReportService implements ISchedulesReportService {
         double globalNocturnaExtra = 0;
         double globalDominical = 0;
         double globalFestivo = 0;
+        int globalTotalShifts = 0;
+        int globalTotalEmployees = 0;
+
+        for (Map.Entry<String, List<Shift>> entry : shiftsByLocation.entrySet()) {
+            List<Shift> locationShifts = entry.getValue();
+            String locationName = locationShifts.get(0).getLocation().getName();
+
+            Map<String, List<Shift>> shiftsByEmployee = locationShifts.stream()
+                    .filter(shift -> shift.getEmployee().getId() != null)
+                    .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId()));
+
+            List<EmployeeReportDto> employeeReports = new ArrayList<>();
+            double locationTotalHours = 0;
+            double locationTotalOvertime = 0;
+            double locationRegularHours = 0;
+            double locationDiurnaExtra = 0;
+            double locationNocturnaExtra = 0;
+            double locationDominical = 0;
+            double locationFestivo = 0;
+            int locationTotalShifts = 0;
+
+            for (Map.Entry<String, List<Shift>> empEntry : shiftsByEmployee.entrySet()) {
+                List<Shift> employeeShifts = empEntry.getValue();
+                EmployeeReportDto report = calculateEmployeeReport(employeeShifts);
+
+                if (report != null) {
+                    employeeReports.add(report);
+                    locationTotalHours += report.getTotalHours();
+                    locationTotalOvertime += report.getOvertimeHours();
+                    locationRegularHours += report.getRegularHours() != null ? report.getRegularHours() : 0;
+                    locationDiurnaExtra += report.getDiurnaExtraHours() != null ? report.getDiurnaExtraHours() : 0;
+                    locationNocturnaExtra += report.getNocturnaExtraHours() != null ? report.getNocturnaExtraHours() : 0;
+                    locationDominical += report.getDominicalHours() != null ? report.getDominicalHours() : 0;
+                    locationFestivo += report.getFestivoHours() != null ? report.getFestivoHours() : 0;
+                    locationTotalShifts += report.getTotalShifts() != null ? report.getTotalShifts() : 0;
+                }
+            }
+
+            LocationReportDto locationReport = new LocationReportDto(
+                    locationName,
+                    shiftsByEmployee.size(),
+                    locationTotalHours,
+                    locationTotalOvertime,
+                    locationRegularHours,
+                    locationDiurnaExtra,
+                    locationNocturnaExtra,
+                    locationDominical,
+                    locationFestivo,
+                    locationTotalShifts,
+                    employeeReports
+            );
+            locationReports.add(locationReport);
+
+            globalTotalEmployees += shiftsByEmployee.size();
+            globalTotalHours += locationTotalHours;
+            globalTotalOvertime += locationTotalOvertime;
+            globalRegularHours += locationRegularHours;
+            globalDiurnaExtra += locationDiurnaExtra;
+            globalNocturnaExtra += locationNocturnaExtra;
+            globalDominical += locationDominical;
+            globalFestivo += locationFestivo;
+            globalTotalShifts += locationTotalShifts;
+        }
+
+        // Collect all employees from all locations
+        List<EmployeeReportDto> allEmployees = locationReports.stream()
+                .flatMap(location -> location.getEmployeeReports().stream())
+                .collect(Collectors.toList());
+
+        GlobalReportDto global = new GlobalReportDto(
+                globalTotalEmployees,
+                globalTotalHours,
+                globalTotalOvertime,
+                globalRegularHours,
+                globalDiurnaExtra,
+                globalNocturnaExtra,
+                globalDominical,
+                globalFestivo,
+                globalTotalShifts
+        );
+        return new ReportResponseDto(global, locationReports, allEmployees);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReportResponseDto generateReportByLocation(int month, int year, String locationId) throws Exception {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        List<Shift> shifts = shiftRepository.findByDateBetweenAndLocationId(startDate, endDate, locationId).stream()
+                .filter(shift -> shift.getStatus() != null && shift.getStatus() && shift.getEmployee() != null && shift.getShiftType() != null)
+                .collect(Collectors.toList());
+
+        Map<String, List<Shift>> shiftsByEmployee = shifts.stream()
+                .filter(shift -> shift.getEmployee().getId() != null)
+                .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId()));
+
+        List<EmployeeReportDto> employeeReports = new ArrayList<>();
+        double locationTotalHours = 0;
+        double locationTotalOvertime = 0;
+        double locationRegularHours = 0;
+        double locationDiurnaExtra = 0;
+        double locationNocturnaExtra = 0;
+        double locationDominical = 0;
+        double locationFestivo = 0;
+        int locationTotalShifts = 0;
 
         for (Map.Entry<String, List<Shift>> entry : shiftsByEmployee.entrySet()) {
             List<Shift> employeeShifts = entry.getValue();
@@ -59,27 +168,44 @@ public class SchedulesReportService implements ISchedulesReportService {
 
             if (report != null) {
                 employeeReports.add(report);
-                globalTotalHours += report.getTotalHours();
-                globalTotalOvertime += report.getOvertimeHours();
-                globalRegularHours += report.getRegularHours() != null ? report.getRegularHours() : 0;
-                globalDiurnaExtra += report.getDiurnaExtraHours() != null ? report.getDiurnaExtraHours() : 0;
-                globalNocturnaExtra += report.getNocturnaExtraHours() != null ? report.getNocturnaExtraHours() : 0;
-                globalDominical += report.getDominicalHours() != null ? report.getDominicalHours() : 0;
-                globalFestivo += report.getFestivoHours() != null ? report.getFestivoHours() : 0;
+                locationTotalHours += report.getTotalHours();
+                locationTotalOvertime += report.getOvertimeHours();
+                locationRegularHours += report.getRegularHours() != null ? report.getRegularHours() : 0;
+                locationDiurnaExtra += report.getDiurnaExtraHours() != null ? report.getDiurnaExtraHours() : 0;
+                locationNocturnaExtra += report.getNocturnaExtraHours() != null ? report.getNocturnaExtraHours() : 0;
+                locationDominical += report.getDominicalHours() != null ? report.getDominicalHours() : 0;
+                locationFestivo += report.getFestivoHours() != null ? report.getFestivoHours() : 0;
+                locationTotalShifts += report.getTotalShifts() != null ? report.getTotalShifts() : 0;
             }
         }
 
+        String locationName = shifts.isEmpty() ? "Unknown" : shifts.get(0).getLocation().getName();
+        LocationReportDto locationReport = new LocationReportDto(
+                locationName,
+                shiftsByEmployee.size(),
+                locationTotalHours,
+                locationTotalOvertime,
+                locationRegularHours,
+                locationDiurnaExtra,
+                locationNocturnaExtra,
+                locationDominical,
+                locationFestivo,
+                locationTotalShifts,
+                employeeReports
+        );
+
         GlobalReportDto global = new GlobalReportDto(
                 shiftsByEmployee.size(),
-                globalTotalHours,
-                globalTotalOvertime,
-                globalRegularHours,
-                globalDiurnaExtra,
-                globalNocturnaExtra,
-                globalDominical,
-                globalFestivo
+                locationTotalHours,
+                locationTotalOvertime,
+                locationRegularHours,
+                locationDiurnaExtra,
+                locationNocturnaExtra,
+                locationDominical,
+                locationFestivo,
+                locationTotalShifts
         );
-        return new ReportResponseDto(global, employeeReports);
+        return new ReportResponseDto(global, Arrays.asList(locationReport), employeeReports);
     }
 
     private EmployeeReportDto calculateEmployeeReport(List<Shift> shifts) {
@@ -131,7 +257,7 @@ public class SchedulesReportService implements ISchedulesReportService {
             // Horas extras
             if (extraForThisShift > 0) {
                 overtimeHours += extraForThisShift;
-                overtimeDetails.add(new OvertimeDetailDto(shift.getDate(), extraForThisShift, shift.getNotes()));
+                overtimeDetails.add(new OvertimeDetailDto(shift.getDate(), extraForThisShift, shift.getNotes(), shift.getLocation().getName()));
 
                 // Categorizar horas extras por tiempo
                 double diurnaExtra = calculateDiurnaExtraHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime(), regularHoursPerDay);
@@ -154,11 +280,13 @@ public class SchedulesReportService implements ISchedulesReportService {
         double dailyAvg = workingDays > 0 ? totalHours / workingDays : 0;
         double weeklyTotal = totalHours / weeksInMonth;
 
+        String employeeId = shifts.get(0).getEmployee().getId();
         String firstName = shifts.get(0).getEmployee().getFirstName() != null ? shifts.get(0).getEmployee().getFirstName() : "";
         String lastName = shifts.get(0).getEmployee().getLastName() != null ? shifts.get(0).getEmployee().getLastName() : "";
         String fullName = (firstName + " " + lastName).trim();
 
         return new EmployeeReportDto(
+                employeeId,
                 fullName,
                 dailyAvg,
                 weeklyTotal,
@@ -169,7 +297,8 @@ public class SchedulesReportService implements ISchedulesReportService {
                 diurnaExtraHours,
                 nocturnaExtraHours,
                 dominicalHours,
-                festivoHours
+                festivoHours,
+                shifts.size()
         );
     }
 

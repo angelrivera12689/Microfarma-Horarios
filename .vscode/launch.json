@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}",
+            "console": "internalConsole"
+        },
+        {
+            "type": "java",
+            "name": "MicrofarmaHorariosApplication",
+            "request": "launch",
+            "mainClass": "MicrofarmaHorarios.MicrofarmaHorariosApplication",
+            "projectName": "crud_basic",
+            "console": "internalConsole"
+        }
+    ]
+}

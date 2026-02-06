@@ -15,7 +15,7 @@ public interface ISchedulesShiftService extends ISchedulesBaseService<Shift> {
 
     List<Shift> findByDateBetween(LocalDate startDate, LocalDate endDate) throws Exception;
 
-    byte[] generateCalendarPdf(int year, int month, String locationId) throws Exception;
+    byte[] generateCalendarPdf(int year, int month, String locationId, String employeeId) throws Exception;
 
     byte[] generatePersonalShiftsPdf(String employeeId) throws Exception;
 

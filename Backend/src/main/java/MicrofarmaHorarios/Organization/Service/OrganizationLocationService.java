@@ -26,4 +26,9 @@ public class OrganizationLocationService extends AOrganizationBaseService<Locati
         return locationRepository.findByCompanyId(companyId);
     }
 
+    @Override
+    public java.util.Optional<Location> findByName(String name) throws Exception {
+        return locationRepository.findByName(name);
+    }
+
 }

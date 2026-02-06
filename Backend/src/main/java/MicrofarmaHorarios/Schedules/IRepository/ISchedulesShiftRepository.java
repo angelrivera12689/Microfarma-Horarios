@@ -16,4 +16,6 @@ public interface ISchedulesShiftRepository extends ISchedulesBaseRepository<Shif
 
     List<Shift> findByDateBetween(LocalDate startDate, LocalDate endDate);
 
+    List<Shift> findByDateBetweenAndLocationId(LocalDate startDate, LocalDate endDate, String locationId);
+
 }

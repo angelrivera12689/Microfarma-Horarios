@@ -11,4 +11,6 @@ public interface IOrganizationLocationRepository extends IOrganizationBaseReposi
 
     List<Location> findByCompanyId(String companyId);
 
+    java.util.Optional<Location> findByName(String name);
+
 }
