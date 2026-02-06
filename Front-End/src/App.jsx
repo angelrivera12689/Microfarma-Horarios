@@ -20,6 +20,7 @@ import Locations from './pages/org/Locations';
 import ShiftTypes from './pages/schedules/ShiftTypes';
 import Shifts from './pages/schedules/Shifts';
 import Reports from './pages/schedules/Reports';
+import ImportSchedules from './pages/schedules/ImportSchedules';
 import News from './pages/news/News';
 import NewsTypes from './pages/news/NewsTypes';
 import Email from './pages/notifications/Email';
@@ -205,6 +206,7 @@ function App() {
           <Route path="schedules/shifttypes" element={<ShiftTypes />} />
           <Route path="schedules/shifts" element={<Shifts />} />
           <Route path="schedules/reports" element={<Reports />} />
+          <Route path="schedules/import" element={<ImportSchedules />} />
           <Route path="news/news" element={<News />} />
           <Route path="news/types" element={<NewsTypes />} />
           <Route path="notifications/email" element={<Email />} />

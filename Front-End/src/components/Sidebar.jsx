@@ -44,6 +44,7 @@ const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
       items: [
         { name: 'Tipos de Turno', path: 'schedules/shifttypes' },
         { name: 'Turnos', path: 'schedules/shifts' },
+        { name: 'Importar desde PDF', path: 'schedules/import' },
         { name: 'Reportes', path: 'schedules/reports' }
       ]
     },
