@@ -26,4 +26,7 @@ public class EmployeeReportDto {
 
     // Número de turnos trabajados
     private Integer totalShifts;
+    
+    // Días laborados
+    private Integer workingDays;
 }
