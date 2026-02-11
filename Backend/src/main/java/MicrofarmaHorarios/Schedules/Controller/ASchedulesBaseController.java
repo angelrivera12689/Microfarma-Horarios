@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import MicrofarmaHorarios.Schedules.Entity.ASchedulesBaseEntity;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesBaseService;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Abstract base controller providing common CRUD endpoints for entities.
@@ -23,6 +25,7 @@ import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
  */
 public abstract class ASchedulesBaseController<T extends ASchedulesBaseEntity, S extends ISchedulesBaseService<T>> {
 
+    protected final Logger logger = LoggerFactory.getLogger(getClass());
     protected S service;
     protected String entityName;
 
@@ -117,10 +120,13 @@ public abstract class ASchedulesBaseController<T extends ASchedulesBaseEntity, S
      */
     @DeleteMapping("{id}")
     public ResponseEntity<ApiResponseDto<T>> delete(@PathVariable String id) {
+        logger.info("DELETE request received for {} with id: {}", entityName, id);
         try {
             service.delete(id);
+            logger.info("{} deleted successfully with id: {}", entityName, id);
             return ResponseEntity.ok(new ApiResponseDto<T>("Registro eliminado", null, true));
         } catch (Exception e) {
+            logger.error("Error deleting {} with id: {}: {}", entityName, id, e.getMessage());
             return ResponseEntity.internalServerError().body(new ApiResponseDto<T>(e.getMessage(), null, false));
         }
     }

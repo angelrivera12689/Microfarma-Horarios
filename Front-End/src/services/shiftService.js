@@ -22,8 +22,25 @@ class ShiftService {
   }
 
   async deleteShift(id) {
-    const response = await apiClient.delete(`/api/schedules/shifts/${id}`);
-    return response;
+    try {
+      console.log(`Attempting to delete shift with id: ${id}`);
+      const response = await apiClient.delete(`/api/schedules/shifts/${id}`);
+      console.log('Delete response raw:', JSON.stringify(response));
+      console.log('Delete response status field:', response.status, typeof response.status);
+      
+      // Backend uses 'status' field, not 'success'
+      if (response && response.status === true) {
+        console.log('Delete successful');
+        return true;
+      } else {
+        console.error('Error deleting shift:', response?.message || 'Unknown error');
+        console.error('Full response:', response);
+        throw new Error(response?.message || 'Error deleting shift');
+      }
+    } catch (error) {
+      console.error('Error deleting shift:', error);
+      throw error;
+    }
   }
 
   async downloadCalendarPdf(year, month, locationId) {

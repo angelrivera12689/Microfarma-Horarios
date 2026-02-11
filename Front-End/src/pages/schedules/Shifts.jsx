@@ -115,13 +115,22 @@ const Shifts = () => {
   };
 
   const handleDelete = async (shift) => {
+    if (!shift?.id) {
+      console.error('Shift ID is missing:', shift);
+      alert('Error: No se puede eliminar el turno porque falta el ID');
+      return;
+    }
+    
     if (window.confirm(`¿Estás seguro de que quieres eliminar este turno?`)) {
       try {
+        console.log('Starting delete for shift:', shift.id);
         await shiftService.deleteShift(shift.id);
+        console.log('Delete successful, reloading shifts...');
         await loadShifts();
+        alert('Turno eliminado correctamente');
       } catch (error) {
         console.error('Error deleting shift:', error);
-        alert('Error al eliminar el turno');
+        alert('Error al eliminar el turno: ' + (error.message || 'Error desconocido'));
       }
     }
   };

@@ -127,6 +127,8 @@ abstract public class ASchedulesBaseService<T extends ASchedulesBaseEntity> impl
         T entityUpdate = op.get();
         entityUpdate.setDeletedAt(LocalDateTime.now());
         entityUpdate.setDeletedBy(UUID.randomUUID().toString());
+        // Also set status to false so findByStateTrue() filters it out
+        entityUpdate.setStatus(false);
 
         getRepository().save(entityUpdate);
     }
