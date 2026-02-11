@@ -255,33 +255,44 @@ public class SchedulesReportController {
     public ResponseEntity<byte[]> exportMonthlyReportPdf(
             @RequestParam int month,
             @RequestParam int year,
-            @RequestParam(required = false) String locationName,
+            @RequestParam(required = false) String locationId,
             @RequestParam(required = false) String employeeId,
             @RequestParam(required = false, defaultValue = "general") String reportType) {
         try {
             ReportResponseDto report;
             String filename;
             
+            logger.info("PDF Export - Type: {}, LocationId: {}, EmployeeId: {}, Month: {}, Year: {}", 
+                reportType, locationId, employeeId, month, year);
+            
             switch (reportType.toLowerCase()) {
                 case "location":
-                    if (locationName != null && !locationName.isEmpty()) {
-                        java.util.Optional<Location> locationOpt = locationService.findByName(locationName);
+                    if (locationId != null && !locationId.isEmpty()) {
+                        java.util.Optional<Location> locationOpt = locationService.findById(locationId);
+                        logger.info("Looking for location by ID: {}, found: {}", locationId, locationOpt.isPresent());
                         if (locationOpt.isPresent()) {
-                            report = reportService.generateReportByLocation(month, year, locationOpt.get().getId());
-                            return exportLocationReportPdf(month, year, locationOpt.get().getId());
+                            report = reportService.generateReportByLocation(month, year, locationId);
+                            logger.info("Generating location report for: {}, employees: {}", 
+                                locationOpt.get().getName(), 
+                                report.getEmployees() != null ? report.getEmployees().size() : 0);
+                            return exportLocationReportPdf(month, year, locationId);
                         }
                     }
+                    logger.warn("Location not found or empty, falling back to general report");
                     report = reportService.generateReport(month, year);
                     filename = "reporte_" + year + "_" + month + ".pdf";
                     break;
                 case "employee":
                     if (employeeId != null) {
+                        logger.info("Generating employee report for: {}", employeeId);
                         return exportEmployeeReportPdf(month, year, employeeId);
                     }
+                    logger.warn("EmployeeId empty, falling back to general report");
                     report = reportService.generateReport(month, year);
                     filename = "reporte_" + year + "_" + month + ".pdf";
                     break;
                 default:
+                    logger.info("Generating general report");
                     report = reportService.generateReport(month, year);
                     filename = "reporte_general_" + year + "_" + month + ".pdf";
             }
@@ -294,6 +305,7 @@ public class SchedulesReportController {
 
             return ResponseEntity.ok().headers(headers).body(pdf);
         } catch (Exception e) {
+            logger.error("Error generating PDF: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

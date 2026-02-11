@@ -68,12 +68,12 @@ class ReportService {
 
   async exportPdf(month, year, options = {}) {
     try {
-      const { reportType = 'general', locationName = null, employeeId = null } = options;
+      const { reportType = 'general', locationId = null, employeeId = null } = options;
       
       let url = `/api/schedules/reports/monthly/pdf?month=${month}&year=${year}&reportType=${reportType}`;
       
-      if (locationName) {
-        url += `&locationName=${encodeURIComponent(locationName)}`;
+      if (locationId) {
+        url += `&locationId=${encodeURIComponent(locationId)}`;
       }
       if (employeeId) {
         url += `&employeeId=${encodeURIComponent(employeeId)}`;
@@ -88,8 +88,8 @@ class ReportService {
       
       // Generate filename based on report type
       let filename = 'reporte';
-      if (reportType === 'location' && locationName) {
-        filename = `reporte_sede_${locationName.replace(/\s+/g, '_')}`;
+      if (reportType === 'location' && locationId) {
+        filename = `reporte_sede_${locationId}`;
       } else if (reportType === 'employee' && employeeId) {
         filename = `reporte_empleado_${employeeId}`;
       } else {

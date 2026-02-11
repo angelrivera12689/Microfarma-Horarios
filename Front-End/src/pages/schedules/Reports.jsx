@@ -111,9 +111,19 @@ const Reports = () => {
 
   const { execute: handleExportPdf, isLoading: isExportingPdf } = useAsyncOperation(
     async () => {
+      // Validation for location and employee reports
+      if (reportType === 'location' && !selectedLocation) {
+        alert('Por favor seleccione una sede para exportar el reporte');
+        return;
+      }
+      if (reportType === 'employee' && !selectedEmployee) {
+        alert('Por favor seleccione un empleado para exportar el reporte');
+        return;
+      }
+      
       const options = {
         reportType,
-        locationName: reportType === 'location' ? selectedLocation : null,
+        locationId: reportType === 'location' ? selectedLocation : null,
         employeeId: reportType === 'employee' ? selectedEmployee : null
       };
       await reportService.exportPdf(selectedMonth, selectedYear, options);
