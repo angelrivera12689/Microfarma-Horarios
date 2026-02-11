@@ -1,4 +1,4 @@
-package MicrofarmaHorarios.Security.IRepository;
+ package MicrofarmaHorarios.Security.IRepository;
 
 import org.springframework.stereotype.Repository;
 

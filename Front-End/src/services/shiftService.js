@@ -27,7 +27,12 @@ class ShiftService {
   }
 
   async downloadCalendarPdf(year, month, locationId) {
-    const blob = await apiClient.get(`/api/schedules/shifts/pdf/${year}/${month}/${locationId}`, {
+    let endpoint = `/api/schedules/shifts/pdf/${year}/${month}`;
+    if (locationId) {
+      endpoint += `?locationId=${locationId}`;
+    }
+    
+    const blob = await apiClient.get(endpoint, {
       responseType: 'blob'
     });
 
