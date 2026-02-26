@@ -3,6 +3,8 @@ import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
 import Button from '../../components/Button';
 import reportService from '../../services/reportService';
+import { exportReportToExcel } from '../../services/excelExportService';
+import { getRates, saveRates, resetRates } from '../../services/rateConfigService';
 import useAsyncOperation from '../../hooks/useAsyncOperation';
 
 const Reports = () => {
@@ -15,7 +17,11 @@ const Reports = () => {
   const [reportType, setReportType] = useState('general'); // 'general', 'location', 'employee'
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState('');
-  
+
+  // Rate configuration modal
+  const [configModalOpen, setConfigModalOpen] = useState(false);
+  const [rateConfig, setRateConfig] = useState(() => getRates());
+
   // Filter options loaded from backend
   const [filterOptions, setFilterOptions] = useState({
     locations: [],
@@ -129,6 +135,42 @@ const Reports = () => {
       await reportService.exportPdf(selectedMonth, selectedYear, options);
     }
   );
+
+  const { execute: handleExportExcel, isLoading: isExportingExcel } = useAsyncOperation(
+    async () => {
+      if (!report) {
+        alert('Por favor genere el reporte primero');
+        return;
+      }
+      
+      exportReportToExcel(report, selectedMonth, selectedYear);
+    }
+  );
+
+  // Rate configuration handlers
+  const openConfigModal = () => {
+    setRateConfig(getRates());
+    setConfigModalOpen(true);
+  };
+
+  const handleRateChange = (field, value) => {
+    setRateConfig(prev => ({
+      ...prev,
+      [field]: parseFloat(value) || 0
+    }));
+  };
+
+  const handleSaveRates = () => {
+    saveRates(rateConfig);
+    setConfigModalOpen(false);
+    alert('Configuración de tarifas guardada correctamente');
+  };
+
+  const handleResetRates = () => {
+    const defaultRates = resetRates();
+    setRateConfig(defaultRates);
+    alert('Tarifas restauradas a valores predeterminados');
+  };
 
   const toggleEmployeeDetails = (employeeId) => {
     setExpandedEmployee(expandedEmployee === employeeId ? null : employeeId);
@@ -355,6 +397,21 @@ const Reports = () => {
             >
               📑 Descargar PDF
             </Button>
+            <Button
+              onClick={() => handleExportExcel()}
+              loading={isExportingExcel}
+              variant="success"
+              aria-label="Exportar a Excel"
+            >
+              📊 Descargar Excel
+            </Button>
+            <Button
+              onClick={openConfigModal}
+              variant="secondary"
+              aria-label="Configurar tarifas"
+            >
+              ⚙️ Tarifas
+            </Button>
           </div>
         </div>
       </div>
@@ -533,6 +590,155 @@ const Reports = () => {
           )}
         </>
       )}
+
+      {/* Rate Configuration Modal */}
+      <Modal
+        isOpen={configModalOpen}
+        onClose={() => setConfigModalOpen(false)}
+        title="⚙️ Configuración de Tarifas"
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <p className="text-sm text-blue-800">
+              <strong>Nota:</strong> Configure las tarifas base y multiplicadores para el cálculo de nómina. 
+              Los valores se guardan en el navegador y se utilizarán al exportar a Excel.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Tarifa Base por Hora (COP)
+            </label>
+            <input
+              type="number"
+              value={rateConfig.baseRate}
+              onChange={(e) => handleRateChange('baseRate', e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              placeholder="5000"
+            />
+            <p className="text-xs text-gray-500 mt-1">Tarifa base (100%) por hora</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Regulares
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.regularHours}
+                onChange={(e) => handleRateChange('regularHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.0"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.regularHours * 100).toFixed(0)}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Extra Diurnas
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.diurnaExtraHours}
+                onChange={(e) => handleRateChange('diurnaExtraHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.35"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.diurnaExtraHours * 100).toFixed(0)}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Extra Nocturnas
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.nocturnaExtraHours}
+                onChange={(e) => handleRateChange('nocturnaExtraHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.50"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.nocturnaExtraHours * 100).toFixed(0)}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Dominicales
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.dominicalHours}
+                onChange={(e) => handleRateChange('dominicalHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.75"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.dominicalHours * 100).toFixed(0)}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Festivas
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.festivoHours}
+                onChange={(e) => handleRateChange('festivoHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.75"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.festivoHours * 100).toFixed(0)}%</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Multiplicador Horas Nocturnas
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={rateConfig.nocturnaHours}
+                onChange={(e) => handleRateChange('nocturnaHours', e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                placeholder="1.35"
+              />
+              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.nocturnaHours * 100).toFixed(0)}%</p>
+            </div>
+          </div>
+
+          <div className="flex justify-between pt-4 border-t border-gray-200">
+            <button
+              type="button"
+              onClick={handleResetRates}
+              className="px-4 py-2 text-red-600 hover:text-red-800 font-medium"
+            >
+              Restaurar Valores Predeterminados
+            </button>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={() => setConfigModalOpen(false)}
+                className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveRates}
+                className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all font-medium shadow-lg"
+              >
+                Guardar Configuración
+              </button>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

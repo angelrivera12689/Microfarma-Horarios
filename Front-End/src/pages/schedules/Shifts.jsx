@@ -5,6 +5,7 @@ import shiftService from '../../services/shiftService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
+import { exportShiftsToExcel } from '../../services/excelExportService';
 
 const Shifts = () => {
   const [shifts, setShifts] = useState([]);
@@ -256,29 +257,9 @@ const Shifts = () => {
     ? shifts.filter(shift => shift.location?.id == selectedLocation)
     : shifts;
 
-  const exportToCSV = () => {
+  const exportToExcel = () => {
     const dataToExport = viewMode === 'calendar' ? filteredShifts : shifts;
-    const headers = ['Fecha', 'Empleado', 'Ubicación', 'Tipo de Turno', 'Notas'];
-    const csvContent = [
-      headers.join(','),
-      ...dataToExport.map(shift => [
-        shift.date || '',
-        shift.employee ? `${shift.employee.firstName} ${shift.employee.lastName}` : 'Sin empleado',
-        shift.location?.name || 'Sin ubicación',
-        shift.shiftType?.name || 'Sin tipo',
-        shift.notes || ''
-      ].map(field => `"${field.replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'turnos.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    exportShiftsToExcel(dataToExport, 'turnos');
   };
 
 
@@ -368,10 +349,10 @@ const Shifts = () => {
               Vista Calendario
             </button>
             <button
-              onClick={exportToCSV}
+              onClick={exportToExcel}
               className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
             >
-              Descargar CSV
+              📊 Descargar Excel
             </button>
             <button
               onClick={handleBulkAdd}
