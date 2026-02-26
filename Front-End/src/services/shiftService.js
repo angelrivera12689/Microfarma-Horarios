@@ -81,6 +81,11 @@ class ShiftService {
       window.URL.revokeObjectURL(url);
     }
   }
+
+  async createBulkShifts(shifts) {
+    const response = await apiClient.post('/api/schedules/shifts/bulk', shifts);
+    return response;
+  }
 }
 
 const shiftService = new ShiftService();

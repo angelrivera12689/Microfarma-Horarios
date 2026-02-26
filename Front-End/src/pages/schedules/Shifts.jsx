@@ -13,6 +13,7 @@ const Shifts = () => {
   const [shiftTypes, setShiftTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'calendar'
   const [selectedLocation, setSelectedLocation] = useState('');
@@ -26,6 +27,35 @@ const Shifts = () => {
     shiftTypeId: '',
     notes: ''
   });
+
+  // Bulk shift creation form data
+  const [bulkFormData, setBulkFormData] = useState({
+    startDate: '',
+    endDate: '',
+    employeeId: '',
+    locationId: '',
+    shiftTypeId: '',
+    notes: ''
+  });
+
+  // Calculate shifts to be created for preview
+  const getBulkShiftsPreview = () => {
+    if (!bulkFormData.startDate || !bulkFormData.endDate) return [];
+    
+    const start = new Date(bulkFormData.startDate);
+    const end = new Date(bulkFormData.endDate);
+    const previewShifts = [];
+    
+    const current = new Date(start);
+    while (current <= end) {
+      previewShifts.push({
+        date: current.toISOString().split('T')[0]
+      });
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return previewShifts;
+  };
 
   useEffect(() => {
     loadShifts();
@@ -100,6 +130,59 @@ const Shifts = () => {
       notes: ''
     });
     setModalOpen(true);
+  };
+
+  const handleBulkAdd = () => {
+    setBulkFormData({
+      startDate: '',
+      endDate: '',
+      employeeId: '',
+      locationId: '',
+      shiftTypeId: '',
+      notes: ''
+    });
+    setBulkModalOpen(true);
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!bulkFormData.startDate || !bulkFormData.endDate || !bulkFormData.employeeId || !bulkFormData.locationId || !bulkFormData.shiftTypeId) {
+      alert('Por favor complete todos los campos requeridos');
+      return;
+    }
+
+    const start = new Date(bulkFormData.startDate);
+    const end = new Date(bulkFormData.endDate);
+    
+    if (start > end) {
+      alert('La fecha de inicio no puede ser mayor que la fecha fin');
+      return;
+    }
+
+    try {
+      const shiftsToCreate = [];
+      const current = new Date(start);
+      
+      while (current <= end) {
+        shiftsToCreate.push({
+          date: current.toISOString().split('T')[0],
+          employee: { id: bulkFormData.employeeId },
+          location: { id: bulkFormData.locationId },
+          shiftType: { id: bulkFormData.shiftTypeId },
+          notes: bulkFormData.notes
+        });
+        current.setDate(current.getDate() + 1);
+      }
+
+      await shiftService.createBulkShifts(shiftsToCreate);
+      setBulkModalOpen(false);
+      await loadShifts();
+      alert(`Se crearon ${shiftsToCreate.length} turnos correctamente`);
+    } catch (error) {
+      console.error('Error creating bulk shifts:', error);
+      alert('Error al crear los turnos en bulk');
+    }
   };
 
   const handleEdit = (shift) => {
@@ -289,6 +372,12 @@ const Shifts = () => {
               className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
             >
               Descargar CSV
+            </button>
+            <button
+              onClick={handleBulkAdd}
+              className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
+            >
+              Crear Turnos en Serie
             </button>
             {viewMode === 'calendar' && (
               <button
@@ -493,6 +582,160 @@ const Shifts = () => {
               className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
             >
               {editingShift ? 'Actualizar' : 'Crear'} Turno
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Bulk Shift Creation Modal */}
+      <Modal
+        isOpen={bulkModalOpen}
+        onClose={() => setBulkModalOpen(false)}
+        title="Crear Turnos en Serie"
+        size="lg"
+      >
+        <form onSubmit={handleBulkSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Inicio *
+              </label>
+              <input
+                type="date"
+                id="startDate"
+                value={bulkFormData.startDate}
+                onChange={(e) => setBulkFormData({...bulkFormData, startDate: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              />
+            </div>
+            <div>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Fin *
+              </label>
+              <input
+                type="date"
+                id="endDate"
+                value={bulkFormData.endDate}
+                onChange={(e) => setBulkFormData({...bulkFormData, endDate: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="bulkEmployeeId" className="block text-sm font-medium text-gray-700 mb-2">
+                Empleado *
+              </label>
+              <select
+                id="bulkEmployeeId"
+                value={bulkFormData.employeeId}
+                onChange={(e) => setBulkFormData({...bulkFormData, employeeId: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              >
+                <option value="">Seleccionar empleado</option>
+                {employees.map(employee => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.firstName} {employee.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="bulkLocationId" className="block text-sm font-medium text-gray-700 mb-2">
+                Ubicación *
+              </label>
+              <select
+                id="bulkLocationId"
+                value={bulkFormData.locationId}
+                onChange={(e) => setBulkFormData({...bulkFormData, locationId: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              >
+                <option value="">Seleccionar ubicación</option>
+                {locations.map(location => (
+                  <option key={location.id} value={location.id}>
+                    {location.name} ({location.company?.name})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="bulkShiftTypeId" className="block text-sm font-medium text-gray-700 mb-2">
+              Tipo de Turno *
+            </label>
+            <select
+              id="bulkShiftTypeId"
+              value={bulkFormData.shiftTypeId}
+              onChange={(e) => setBulkFormData({...bulkFormData, shiftTypeId: e.target.value})}
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+            >
+              <option value="">Seleccionar tipo de turno</option>
+              {shiftTypes.map(shiftType => (
+                <option key={shiftType.id} value={shiftType.id}>
+                  {shiftType.name} ({shiftType.startTime} - {shiftType.endTime})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="bulkNotes" className="block text-sm font-medium text-gray-700 mb-2">
+              Notas
+            </label>
+            <textarea
+              id="bulkNotes"
+              value={bulkFormData.notes}
+              onChange={(e) => setBulkFormData({...bulkFormData, notes: e.target.value})}
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              placeholder="Notas adicionales para todos los turnos"
+            />
+          </div>
+
+          {/* Preview of shifts to be created */}
+          {bulkFormData.startDate && bulkFormData.endDate && (
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
+              <h4 className="font-medium text-purple-900 mb-2">
+                Vista Previa de Turnos a Crear
+              </h4>
+              <div className="text-sm text-purple-700">
+                {getBulkShiftsPreview().length} turnos serán creados
+              </div>
+              <div className="mt-2 max-h-32 overflow-y-auto text-xs text-purple-600">
+                {getBulkShiftsPreview().slice(0, 10).map((shift, idx) => (
+                  <div key={idx} className="py-1">
+                    {shift.date}
+                  </div>
+                ))}
+                {getBulkShiftsPreview().length > 10 && (
+                  <div className="py-1 italic">
+                    ... y {getBulkShiftsPreview().length - 10} más
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setBulkModalOpen(false)}
+              className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+            >
+              Crear {getBulkShiftsPreview().length > 0 ? getBulkShiftsPreview().length : ''} Turnos
             </button>
           </div>
         </form>
