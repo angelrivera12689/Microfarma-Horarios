@@ -42,6 +42,7 @@ import MicrofarmaHorarios.Schedules.DTO.Response.OvertimeDetailDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportFiltersDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesReportService;
+import MicrofarmaHorarios.Schedules.Service.ExcelExportService;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
 
 @RestController
@@ -57,6 +58,9 @@ public class SchedulesReportController {
 
     @Autowired
     private IOrganizationLocationService locationService;
+
+    @Autowired
+    private ExcelExportService excelExportService;
 
     // ==================== FILTER ENDPOINTS ====================
 
@@ -709,5 +713,53 @@ public class SchedulesReportController {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    // ==================== EXCEL EXPORT ENDPOINTS ====================
+
+    /**
+     * Exporta un informe completo en formato Excel con diseño profesional
+     * Incluye tres hojas: Resumen Global, Informe por Ubicaciones, Informe por Empleado
+     */
+    @GetMapping("/export/excel")
+    public ResponseEntity<byte[]> exportExcelReport(
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) String locationId,
+            @RequestParam(required = false) String employeeId) {
+        try {
+            logger.info("Exporting Excel report for month={}, year={}, locationId={}, employeeId={}", 
+                    month, year, locationId, employeeId);
+
+            ReportResponseDto report;
+            String filename;
+
+            if (employeeId != null && !employeeId.isEmpty()) {
+                report = reportService.generateReportByEmployee(month, year, employeeId);
+                filename = "reporte_empleado_" + year + "_" + month + ".xlsx";
+            } else if (locationId != null && !locationId.isEmpty()) {
+                report = reportService.generateReportByLocation(month, year, locationId);
+                filename = "reporte_sede_" + year + "_" + month + ".xlsx";
+            } else {
+                report = reportService.generateReport(month, year);
+                filename = "reporte_general_" + year + "_" + month + ".xlsx";
+            }
+
+            byte[] excelBytes = excelExportService.generateProfessionalExcelReport(report, month, year);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", filename);
+            headers.setContentLength(excelBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+
+        } catch (Exception e) {
+            logger.error("Error generating Excel report: ", e);
+            return ResponseEntity.internalServerError()
+                    .body(("Error al generar informe Excel: " + e.getMessage()).getBytes());
+        }
     }
 }
