@@ -7,7 +7,7 @@ class EmployeeService {
   }
 
   async getActiveEmployees() {
-    const response = await apiClient.get('/api/humanresources/employees/state/true');
+    const response = await apiClient.get('/api/humanresources/employees');
     return response;
   }
 

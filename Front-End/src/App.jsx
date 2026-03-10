@@ -21,6 +21,9 @@ import ShiftTypes from './pages/schedules/ShiftTypes';
 import Shifts from './pages/schedules/Shifts';
 import Reports from './pages/schedules/Reports';
 import ImportSchedules from './pages/schedules/ImportSchedules';
+import TemplateTypes from './pages/DefaultHours/TemplateTypes';
+import TemplateAssignment from './pages/DefaultHours/TemplateAssignment';
+import MonthlyReport from './pages/DefaultHours/MonthlyReport';
 import News from './pages/news/News';
 import NewsTypes from './pages/news/NewsTypes';
 import Email from './pages/notifications/Email';
@@ -207,6 +210,9 @@ function App() {
           <Route path="schedules/shifts" element={<Shifts />} />
           <Route path="schedules/reports" element={<Reports />} />
           <Route path="schedules/import" element={<ImportSchedules />} />
+          <Route path="schedules/default-hours/templates" element={<TemplateTypes />} />
+          <Route path="schedules/default-hours/assignments" element={<TemplateAssignment />} />
+          <Route path="schedules/default-hours/report" element={<MonthlyReport />} />
           <Route path="news/news" element={<News />} />
           <Route path="news/types" element={<NewsTypes />} />
           <Route path="notifications/email" element={<Email />} />
