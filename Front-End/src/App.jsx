@@ -210,9 +210,9 @@ function App() {
           <Route path="schedules/shifts" element={<Shifts />} />
           <Route path="schedules/reports" element={<Reports />} />
           <Route path="schedules/import" element={<ImportSchedules />} />
-          <Route path="schedules/default-hours/templates" element={<TemplateTypes />} />
-          <Route path="schedules/default-hours/assignments" element={<TemplateAssignment />} />
-          <Route path="schedules/default-hours/report" element={<MonthlyReport />} />
+          <Route path="hour-templates/templates" element={<TemplateTypes />} />
+          <Route path="hour-templates/assignments" element={<TemplateAssignment />} />
+          <Route path="hour-templates/report" element={<MonthlyReport />} />
           <Route path="news/news" element={<News />} />
           <Route path="news/types" element={<NewsTypes />} />
           <Route path="notifications/email" element={<Email />} />

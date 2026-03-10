@@ -4,6 +4,7 @@ import hourTemplateAssignmentService from '../../services/hourTemplateAssignment
 import hourTemplateService from '../../services/hourTemplateService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
+import jsPDF from 'jspdf';
 
 const MonthlyReport = () => {
   const [loading, setLoading] = useState(false);
@@ -138,111 +139,106 @@ const MonthlyReport = () => {
     }
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
     if (!reportData) return;
 
+    setLoading(true);
     const monthName = months.find(m => m.value === reportData.month)?.label;
     
-    // Create HTML content for printing
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Reporte de Horas - ${monthName} ${reportData.year}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #dc2626; padding-bottom: 10px; }
-          .header h1 { color: #dc2626; font-size: 24px; margin-bottom: 5px; }
-          .header .subtitle { color: #666; font-size: 14px; }
-          .filters { background: #f3f4f6; padding: 10px; margin-bottom: 20px; border-radius: 4px; }
-          .filters p { margin: 2px 0; font-size: 12px; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th { background: #dc2626; color: white; padding: 10px; text-align: center; font-size: 12px; }
-          td { padding: 8px; text-align: center; border: 1px solid #ddd; font-size: 11px; }
-          tr:nth-child(even) { background: #f9fafb; }
-          .totals-row { background: #fef3c7 !important; font-weight: bold; }
-          .summary { display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 4px; }
-          .summary-item { text-align: center; }
-          .summary-item .label { font-size: 12px; color: #666; }
-          .summary-item .value { font-size: 18px; font-weight: bold; color: #166534; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #999; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>MICROFARMA HORARIOS</h1>
-          <div class="subtitle">Reporte de Horas - ${monthName} ${reportData.year}</div>
-        </div>
-        
-        <div class="filters">
-          <p><strong>Fecha de generación:</strong> ${new Date(reportData.generatedAt).toLocaleString('es-CO')}</p>
-          <p><strong>Total empleados:</strong> ${reportData.employees.length}</p>
-          ${filterEmployee ? `<p><strong>Filtro empleado:</strong> ${employees.find(e => e.id === filterEmployee)?.firstName} ${employees.find(e => e.id === filterEmployee)?.lastName}</p>` : ''}
-          ${filterLocation ? `<p><strong>Filtro ubicación:</strong> ${locations.find(l => l.id === filterLocation)?.name}</p>` : ''}
+    try {
+      // Create a temporary container for the report content
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.width = '1100px';
+      container.style.padding = '20px';
+      container.style.background = 'white';
+      container.style.fontFamily = 'Arial, sans-serif';
+      
+      container.innerHTML = `
+        <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
+          <h1 style="color: #dc2626; font-size: 24px; margin-bottom: 5px;">MICROFARMA HORARIOS</h1>
+          <div style="color: #666; font-size: 14px;">Reporte de Horas - ${monthName} ${reportData.year}</div>
+          <div style="color: #666; font-size: 12px; margin-top: 5px;">Total empleados: ${reportData.employees.length}</div>
         </div>
 
-        <table>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px;">
           <thead>
-            <tr>
-              <th>EMPLEADO</th>
-              <th>UBICACIÓN</th>
-              <th>ORDINARIAS</th>
-              <th>DIURNAS</th>
-              <th>NOCTURNAS</th>
-              <th>EXTRA F/DOM</th>
-              <th>DOMINICALES</th>
-              <th>TOTAL HORAS</th>
+            <tr style="background: #dc2626; color: white;">
+              <th style="padding: 8px; text-align: center;">EMPLEADO</th>
+              <th style="padding: 8px; text-align: center;">UBICACIÓN</th>
+              <th style="padding: 8px; text-align: center;">ORDINARIAS</th>
+              <th style="padding: 8px; text-align: center;">DIURNAS</th>
+              <th style="padding: 8px; text-align: center;">NOCTURNAS</th>
+              <th style="padding: 8px; text-align: center;">EXTRA F/DOM</th>
+              <th style="padding: 8px; text-align: center;">DOMINICALES</th>
+              <th style="padding: 8px; text-align: center;">TOTAL HORAS</th>
             </tr>
           </thead>
           <tbody>
             ${reportData.employees.map(emp => `
               <tr>
-                <td style="text-align: left;">${emp.employeeName}</td>
-                <td style="text-align: left;">${emp.locationName}</td>
-                <td>${emp.ordinarias > 0 ? emp.ordinarias.toFixed(2) : '-'}</td>
-                <td>${emp.diurnas > 0 ? emp.diurnas.toFixed(2) : '-'}</td>
-                <td>${emp.nocturnas > 0 ? emp.nocturnas.toFixed(2) : '-'}</td>
-                <td>${emp.extraFDom > 0 ? emp.extraFDom.toFixed(2) : '-'}</td>
-                <td>${emp.dominicales > 0 ? emp.dominicales.toFixed(2) : '-'}</td>
-                <td><strong>${emp.totalHours.toFixed(2)}</strong></td>
+                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${emp.employeeName}</td>
+                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${emp.locationName}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.ordinarias > 0 ? emp.ordinarias.toFixed(2) : '-'}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.diurnas > 0 ? emp.diurnas.toFixed(2) : '-'}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.nocturnas > 0 ? emp.nocturnas.toFixed(2) : '-'}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.extraFDom > 0 ? emp.extraFDom.toFixed(2) : '-'}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.dominicales > 0 ? emp.dominicales.toFixed(2) : '-'}</td>
+                <td style="padding: 6px; text-align: center; border: 1px solid #ddd; font-weight: bold;">${emp.totalHours.toFixed(2)}</td>
               </tr>
             `).join('')}
-            <tr class="totals-row">
-              <td colspan="2"><strong>TOTALES GENERALES</strong></td>
-              <td>${reportData.grandTotals.ordinarias.toFixed(2)}</td>
-              <td>${reportData.grandTotals.diurnas.toFixed(2)}</td>
-              <td>${reportData.grandTotals.nocturnas.toFixed(2)}</td>
-              <td>${reportData.grandTotals.extraFDom.toFixed(2)}</td>
-              <td>${reportData.grandTotals.dominicales.toFixed(2)}</td>
-              <td><strong>${reportData.grandTotals.totalHours.toFixed(2)}</strong></td>
+            <tr style="background: #fef3c7; font-weight: bold;">
+              <td colspan="2" style="padding: 6px; text-align: center; border: 1px solid #ddd;"><strong>TOTALES GENERALES</strong></td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.ordinarias.toFixed(2)}</td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.diurnas.toFixed(2)}</td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.nocturnas.toFixed(2)}</td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.extraFDom.toFixed(2)}</td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.dominicales.toFixed(2)}</td>
+              <td style="padding: 6px; text-align: center; border: 1px solid #ddd; font-weight: bold;">${reportData.grandTotals.totalHours.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
 
-        <div class="summary">
-          <div class="summary-item">
-            <div class="label">Total Empleados</div>
-            <div class="value">${reportData.employees.length}</div>
+        <div style="display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 4px;">
+          <div style="text-align: center;">
+            <div style="font-size: 12px; color: #666;">Total Empleados</div>
+            <div style="font-size: 18px; font-weight: bold; color: #166534;">${reportData.employees.length}</div>
           </div>
-          <div class="summary-item">
-            <div class="label">Total Horas</div>
-            <div class="value">${reportData.grandTotals.totalHours.toFixed(2)}</div>
+          <div style="text-align: center;">
+            <div style="font-size: 12px; color: #666;">Total Horas</div>
+            <div style="font-size: 18px; font-weight: bold; color: #166534;">${reportData.grandTotals.totalHours.toFixed(2)}</div>
           </div>
         </div>
 
-        <div class="footer">
+        <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #999;">
           <p>Sistema de Gestión de Horarios - Microfarma</p>
         </div>
-      </body>
-      </html>
-    `;
-
-    // Open print window
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.print();
+      `;
+      
+      document.body.appendChild(container);
+      
+      // Use html2canvas to capture the content
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(container, { scale: 2 });
+      
+      document.body.removeChild(container);
+      
+      // Create PDF
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = 287;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+      pdf.save(`reporte_horas_${monthName}_${reportData.year}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Error al generar el PDF');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

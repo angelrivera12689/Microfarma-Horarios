@@ -45,10 +45,16 @@ const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
         { name: 'Tipos de Turno', path: 'schedules/shifttypes' },
         { name: 'Turnos', path: 'schedules/shifts' },
         { name: 'Importar desde PDF', path: 'schedules/import' },
-        { name: 'Reportes', path: 'schedules/reports' },
-        { name: 'Plantillas de Horas', path: 'schedules/default-hours/templates', icon: '⏰' },
-        { name: 'Asignar Plantillas', path: 'schedules/default-hours/assignments', icon: '👤' },
-        { name: 'Reporte Mensual', path: 'schedules/default-hours/report', icon: '📊' }
+        { name: 'Reportes', path: 'schedules/reports' }
+      ]
+    },
+    {
+      name: 'Plantillas de Horarios',
+      icon: '⏰',
+      items: [
+        { name: 'Plantillas', path: 'hour-templates/templates' },
+        { name: 'Asignaciones', path: 'hour-templates/assignments' },
+        { name: 'Reporte Mensual', path: 'hour-templates/report' }
       ]
     },
     {
