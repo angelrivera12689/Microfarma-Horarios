@@ -1,7 +1,9 @@
 package MicrofarmaHorarios.Schedules.Service;
 
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -9,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import MicrofarmaHorarios.Schedules.Entity.ShiftTimeRange;
 import MicrofarmaHorarios.Schedules.Entity.ShiftType;
 import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftTypeRepository;
 
@@ -50,6 +53,13 @@ public class ShiftTypeDetectionService {
     // Rest day
     private static final String DESCANSO_NAME = "Descanso";
     
+    // Split shift (PARTIDO): Morning 07:00-13:00 + Afternoon 17:00-22:00
+    private static final String PARTIDO_NAME = "Partido";
+    private static final LocalTime PARTIDO_MORNING_START = LocalTime.of(7, 0);
+    private static final LocalTime PARTIDO_MORNING_END = LocalTime.of(13, 0);
+    private static final LocalTime PARTIDO_AFTERNOON_START = LocalTime.of(17, 0);
+    private static final LocalTime PARTIDO_AFTERNOON_END = LocalTime.of(22, 0);
+    
     private static final Map<String, String> SHIFT_NAME_MAPPING = new HashMap<>();
     
     static {
@@ -66,6 +76,7 @@ public class ShiftTypeDetectionService {
         SHIFT_NAME_MAPPING.put("SUNDAY", DOMINGO_NAME);
         SHIFT_NAME_MAPPING.put("LIBRE", DESCANSO_NAME);
         SHIFT_NAME_MAPPING.put("REST", DESCANSO_NAME);
+        SHIFT_NAME_MAPPING.put("PARTIDO", PARTIDO_NAME);
     }
     
     /**
@@ -96,8 +107,59 @@ public class ShiftTypeDetectionService {
             return existing.get();
         }
         
+        // Check for special multi-range shifts
+        if (PARTIDO_NAME.equalsIgnoreCase(canonicalName) || "PARTIDO".equalsIgnoreCase(normalizedName)) {
+            return createMultiRangeShiftType(PARTIDO_NAME, 
+                "Turno partido - 7am a 1pm y 5pm a 10pm (8 horas)",
+                PARTIDO_MORNING_START, PARTIDO_MORNING_END,
+                PARTIDO_AFTERNOON_START, PARTIDO_AFTERNOON_END);
+        }
+        
         // Create new shift type
         return createNewShiftType(canonicalName, startTime, endTime);
+    }
+    
+    /**
+     * Create a multi-range shift type with two time ranges.
+     * Used for PARTIDO type shifts.
+     * 
+     * @param name        Shift type name
+     * @param description Shift type description
+     * @param range1Start Start time of first range
+     * @param range1End   End time of first range
+     * @param range2Start Start time of second range
+     * @param range2End   End time of second range
+     * @return The created ShiftType
+     */
+    public ShiftType createMultiRangeShiftType(String name, String description,
+            LocalTime range1Start, LocalTime range1End,
+            LocalTime range2Start, LocalTime range2End) {
+        
+        // Check if it already exists
+        Optional<ShiftType> existing = shiftTypeRepository.findByNameIgnoreCase(name);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        
+        ShiftType newShiftType = new ShiftType();
+        newShiftType.setName(name);
+        newShiftType.setDescription(description);
+        newShiftType.setIsMultiRange(true);
+        
+        // Add time ranges
+        newShiftType.addTimeRange(range1Start, range1End, 1);
+        newShiftType.addTimeRange(range2Start, range2End, 2);
+        
+        // Set backward compatible fields from first range
+        newShiftType.setStartTime(range1Start);
+        newShiftType.setEndTime(range2End);
+        newShiftType.setIsNightShift(false); // Neither range is night
+        
+        ShiftType saved = shiftTypeRepository.save(newShiftType);
+        log.info("Created multi-range shift type: {} with ranges {}-{} and {}-{}", 
+            name, range1Start, range1End, range2Start, range2End);
+        
+        return saved;
     }
     
     /**
@@ -121,6 +183,10 @@ public class ShiftTypeDetectionService {
             newShiftType.setEndTime(MAÑANA_END);
             newShiftType.setIsNightShift(false);
         }
+        
+        // Initialize time ranges list (empty for single-range)
+        newShiftType.setTimeRanges(new ArrayList<>());
+        newShiftType.setIsMultiRange(false);
         
         newShiftType.setDescription("Imported from PDF: " + name);
         
@@ -163,5 +229,46 @@ public class ShiftTypeDetectionService {
         }
         
         return "TURNO";
+    }
+    
+    /**
+     * Calculate total hours for a shift type.
+     * For multi-range shifts, sums all time ranges.
+     * For single-range shifts, uses the simple start-end calculation.
+     * 
+     * @param shiftType The shift type to calculate hours for
+     * @return Total hours
+     */
+    public double calculateTotalHours(ShiftType shiftType) {
+        if (shiftType == null) {
+            return 0.0;
+        }
+        
+        // Use the entity method if time ranges exist
+        if (shiftType.getTimeRanges() != null && !shiftType.getTimeRanges().isEmpty()) {
+            return shiftType.getTotalDurationHours();
+        }
+        
+        // Fallback to simple calculation for backward compatibility
+        return calculateSimpleHours(shiftType.getStartTime(), shiftType.getEndTime());
+    }
+    
+    /**
+     * Simple hours calculation (for backward compatibility).
+     */
+    private double calculateSimpleHours(LocalTime start, LocalTime end) {
+        if (start == null || end == null) {
+            return 0.0;
+        }
+        
+        // Handle night shift crossing midnight
+        if (end.isBefore(start)) {
+            int startToMidnight = 24 - start.getHour();
+            int midnightToEnd = end.getHour();
+            return startToMidnight + midnightToEnd;
+        }
+        
+        return (end.getHour() - start.getHour()) + 
+               (end.getMinute() - start.getMinute()) / 60.0;
     }
 }

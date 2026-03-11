@@ -626,9 +626,6 @@ public class SchedulesReportController {
                 .setTextAlignment(TextAlignment.CENTER)
                 .setMarginTop(5)
                 .setFontColor(ColorConstants.GRAY));
-        document.add(new Paragraph("Fecha de generación: " + LocalDate.now())
-                .setFontSize(9)
-                .setTextAlignment(TextAlignment.CENTER));
     }
 
     private Cell createHeaderCell(String text, Color backgroundColor) {

@@ -230,7 +230,15 @@ public class SchedulesReportService implements ISchedulesReportService {
 
         for (Shift shift : shifts) {
             if (shift.getShiftType() == null) continue;
-            double hours = calculateHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime());
+            
+            // Use new time ranges method if available, otherwise fallback to simple calculation
+            double hours;
+            if (shift.getShiftType().getTimeRanges() != null && 
+                !shift.getShiftType().getTimeRanges().isEmpty()) {
+                hours = shift.getShiftType().getTotalDurationHours();
+            } else {
+                hours = calculateHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime());
+            }
             totalHours += hours;
 
             // Determinar tipo de día

@@ -2,6 +2,7 @@ package MicrofarmaHorarios.Security.Config;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -363,9 +364,14 @@ public class DataInitializer implements CommandLineRunner {
         createShiftTypeIfNotExists("NOCHE", "Turno nocturno - 10pm a 7am", 
             LocalTime.of(22, 0), LocalTime.of(7, 0), true);
         
-        // Turno PARTIDO: Mañana (7am-2pm) y Tarde (6pm-10pm) - 8 horas con descanso de 4 horas
-        createShiftTypeIfNotExists("PARTIDO", "Turno partido - 7am a 2pm y 6pm a 10pm (8 horas)", 
-            LocalTime.of(7, 0), LocalTime.of(22, 0), false);
+        // Turno PARTIDO: Mañana (7am-1pm) y Tarde (5pm-10pm) - 8 horas con descanso de 4 horas
+        // This is the multi-range shift that requires proper time ranges
+        createMultiRangeShiftTypeIfNotExists(
+            "PARTIDO", 
+            "Turno partido - 7am a 1pm y 5pm a 10pm (8 horas)",
+            LocalTime.of(7, 0), LocalTime.of(13, 0),  // First range: 7am-1pm
+            LocalTime.of(17, 0), LocalTime.of(22, 0)   // Second range: 5pm-10pm
+        );
         
         // Turno LARGO: Extendido 7:00 AM - 10:00 PM (15 horas)
         createShiftTypeIfNotExists("LARGO", "Turno extendido - 7am a 10pm (15 horas)", 
@@ -375,8 +381,42 @@ public class DataInitializer implements CommandLineRunner {
         logger.info("    - MAÑANA: 7am-2pm (7h)");
         logger.info("    - TARDE: 2pm-10pm (8h)");
         logger.info("    - NOCHE: 10pm-7am (9h)");
-        logger.info("    - PARTIDO: 7am-2pm + 6pm-10pm (8h)");
+        logger.info("    - PARTIDO: 7am-1pm + 5pm-10pm (8h)");
         logger.info("    - LARGO: 7am-10pm (15h)");
+    }
+
+    /**
+     * Creates a multi-range shift type if it doesn't exist.
+     * Used for PARTIDO type shifts with two time ranges.
+     */
+    private void createMultiRangeShiftTypeIfNotExists(String name, String description,
+            LocalTime range1Start, LocalTime range1End,
+            LocalTime range2Start, LocalTime range2End) throws Exception {
+        
+        java.util.Optional<ShiftType> existingShiftType = shiftTypeRepository.findFirstByNameIgnoreCase(name);
+        
+        if (existingShiftType.isPresent()) {
+            logger.debug("    Tipo de turno '{}' ya existe", name);
+            return;
+        }
+
+        ShiftType shiftType = new ShiftType();
+        shiftType.setName(name);
+        shiftType.setDescription(description);
+        shiftType.setIsMultiRange(true);
+        
+        // Add time ranges
+        shiftType.addTimeRange(range1Start, range1End, 1);
+        shiftType.addTimeRange(range2Start, range2End, 2);
+        
+        // Set backward compatible fields from first range
+        shiftType.setStartTime(range1Start);
+        shiftType.setEndTime(range2End);
+        shiftType.setIsNightShift(false); // Neither range is night
+
+        shiftTypeRepository.save(shiftType);
+        logger.info("    Nuevo tipo de turno multi-rango: {} | {}-{} y {}-{} | {}", 
+            name, range1Start, range1End, range2Start, range2End, description);
     }
 
     /**
@@ -397,6 +437,8 @@ public class DataInitializer implements CommandLineRunner {
         shiftType.setStartTime(startTime);
         shiftType.setEndTime(endTime);
         shiftType.setIsNightShift(isNightShift);
+        shiftType.setIsMultiRange(false);
+        shiftType.setTimeRanges(new java.util.ArrayList<>());
 
         shiftTypeRepository.save(shiftType);
         logger.info("    Nuevo tipo de turno: {} | {} | {}", name, startTime + "-" + endTime, description);

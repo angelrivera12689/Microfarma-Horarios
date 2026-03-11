@@ -210,15 +210,27 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                 // Location
                 table.addCell(new Cell().add(new Paragraph(shift.getLocation().getName()).setFontSize(10).setTextAlignment(TextAlignment.CENTER)).setPadding(8));
 
-                // Time
-                String time = convertTo12HourFormat(shift.getShiftType().getStartTime().toString()) + " - " +
-                    convertTo12HourFormat(shift.getShiftType().getEndTime().toString());
+                // Time - use formatted time ranges for multi-range shifts
+                String time;
+                if (shift.getShiftType().getTimeRanges() != null && 
+                    !shift.getShiftType().getTimeRanges().isEmpty()) {
+                    time = shift.getShiftType().getFormattedTimeRanges();
+                } else {
+                    time = convertTo12HourFormat(shift.getShiftType().getStartTime().toString()) + " - " +
+                        convertTo12HourFormat(shift.getShiftType().getEndTime().toString());
+                }
                 table.addCell(new Cell().add(new Paragraph(time).setFontSize(10).setTextAlignment(TextAlignment.CENTER)).setPadding(8));
 
-                // Duration (calculate hours and minutes)
-                String startTime = shift.getShiftType().getStartTime().toString();
-                String endTime = shift.getShiftType().getEndTime().toString();
-                String duration = calculateDuration(startTime, endTime);
+                // Duration (calculate hours and minutes) - use total duration for multi-range
+                double durationHours;
+                if (shift.getShiftType().getTimeRanges() != null && 
+                    !shift.getShiftType().getTimeRanges().isEmpty()) {
+                    durationHours = shift.getShiftType().getTotalDurationHours();
+                } else {
+                    durationHours = calculateDurationHours(shift.getShiftType().getStartTime(), 
+                                                          shift.getShiftType().getEndTime());
+                }
+                String duration = String.format("%.1fh", durationHours);
                 table.addCell(new Cell().add(new Paragraph(duration).setFontSize(10).setTextAlignment(TextAlignment.CENTER)).setPadding(8));
             }
 
@@ -273,6 +285,30 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
         } catch (Exception e) {
             return "N/A";
         }
+    }
+    
+    /**
+     * Calculates duration in hours from LocalTime objects.
+     * Handles night shifts that cross midnight.
+     * 
+     * @param startTime Start time
+     * @param endTime   End time
+     * @return Duration in hours
+     */
+    private double calculateDurationHours(java.time.LocalTime startTime, java.time.LocalTime endTime) {
+        if (startTime == null || endTime == null) {
+            return 0.0;
+        }
+        
+        // Handle night shift crossing midnight
+        if (endTime.isBefore(startTime)) {
+            int startToMidnight = 24 - startTime.getHour();
+            int midnightToEnd = endTime.getHour();
+            return startToMidnight + midnightToEnd;
+        }
+        
+        return (endTime.getHour() - startTime.getHour()) + 
+               (endTime.getMinute() - startTime.getMinute()) / 60.0;
     }
 
     @Override
@@ -457,8 +493,16 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                     for (Shift shift : dayShifts) {
                         String employeeName = shift.getEmployee().getFirstName() + " " + shift.getEmployee().getLastName();
                         String shiftType = shift.getShiftType().getName();
-                        String time = shift.getShiftType().getStartTime().toString().substring(0, 5) + " - " +
-                            shift.getShiftType().getEndTime().toString().substring(0, 5);
+                        
+                        // Use formatted time ranges for multi-range shifts
+                        String time;
+                        if (shift.getShiftType().getTimeRanges() != null && 
+                            !shift.getShiftType().getTimeRanges().isEmpty()) {
+                            time = shift.getShiftType().getFormattedTimeRanges();
+                        } else {
+                            time = shift.getShiftType().getStartTime().toString().substring(0, 5) + " - " +
+                                shift.getShiftType().getEndTime().toString().substring(0, 5);
+                        }
 
                         // Shift box with light red background
                         Table shiftTable = new Table(new float[]{1});
