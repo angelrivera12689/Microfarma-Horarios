@@ -76,6 +76,7 @@ public class ShiftTypeDetectionService {
         SHIFT_NAME_MAPPING.put("SUNDAY", DOMINGO_NAME);
         SHIFT_NAME_MAPPING.put("LIBRE", DESCANSO_NAME);
         SHIFT_NAME_MAPPING.put("REST", DESCANSO_NAME);
+        SHIFT_NAME_MAPPING.put("DESCANSO", DESCANSO_NAME);
         SHIFT_NAME_MAPPING.put("PARTIDO", PARTIDO_NAME);
     }
     

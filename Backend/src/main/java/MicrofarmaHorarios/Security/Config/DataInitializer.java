@@ -154,7 +154,7 @@ public class DataInitializer implements CommandLineRunner {
             logger.info("- Roles: 4 (ADMIN, GERENTE_SUCURSAL, EMPLEADO, USER)");
             logger.info("- Tipos de contrato: 4");
             logger.info("- Cargos: 5");
-            logger.info("- Tipos de turno: 5");
+            logger.info("- Tipos de turno: 6");
             logger.info("- Empleados: 35");
             logger.info("- Usuarios: 36 (35 empleados + 1 administrador)");
             logger.info("=========================================================");
@@ -376,13 +376,18 @@ public class DataInitializer implements CommandLineRunner {
         // Turno LARGO: Extendido 7:00 AM - 10:00 PM (15 horas)
         createShiftTypeIfNotExists("LARGO", "Turno extendido - 7am a 10pm (15 horas)", 
             LocalTime.of(7, 0), LocalTime.of(22, 0), false);
+        
+        // Turno DESCANSO: Día de descanso - 0 horas (sin trabajo)
+        createShiftTypeIfNotExists("DESCANSO", "Día de descanso - Sin horas de trabajo", 
+            LocalTime.of(0, 0), LocalTime.of(0, 0), false);
 
-        logger.info("    Tipos de turno completados: 5");
+        logger.info("    Tipos de turno completados: 6");
         logger.info("    - MAÑANA: 7am-2pm (7h)");
         logger.info("    - TARDE: 2pm-10pm (8h)");
         logger.info("    - NOCHE: 10pm-7am (9h)");
         logger.info("    - PARTIDO: 7am-1pm + 5pm-10pm (8h)");
         logger.info("    - LARGO: 7am-10pm (15h)");
+        logger.info("    - DESCANSO: 0h (descanso)");
     }
 
     /**
