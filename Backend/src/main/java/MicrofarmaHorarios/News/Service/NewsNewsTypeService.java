@@ -1,5 +1,7 @@
 package MicrofarmaHorarios.News.Service;
 
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +19,11 @@ public class NewsNewsTypeService extends ANewsBaseService<NewsType> implements I
     @Override
     protected INewsBaseRepository<NewsType, String> getRepository() {
         return newsTypeRepository;
+    }
+
+    @Override
+    public Optional<NewsType> findByNameIgnoreCase(String name) throws Exception {
+        return newsTypeRepository.findByNameIgnoreCase(name);
     }
 
 }

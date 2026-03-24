@@ -7,7 +7,7 @@ import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
 import { exportShiftsToExcel } from '../../services/excelExportService';
 
-const Shifts = () => {
+const DeliveryShifts = () => {
   const [shifts, setShifts] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [locations, setLocations] = useState([]);
@@ -16,7 +16,7 @@ const Shifts = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
-  const [viewMode, setViewMode] = useState('table'); // 'table' or 'calendar'
+  const [viewMode, setViewMode] = useState('table');
   const [selectedLocation, setSelectedLocation] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -29,7 +29,6 @@ const Shifts = () => {
     notes: ''
   });
 
-  // Bulk shift creation form data
   const [bulkFormData, setBulkFormData] = useState({
     startDate: '',
     endDate: '',
@@ -39,7 +38,6 @@ const Shifts = () => {
     notes: ''
   });
 
-  // Calculate shifts to be created for preview
   const getBulkShiftsPreview = () => {
     if (!bulkFormData.startDate || !bulkFormData.endDate) return [];
     
@@ -70,12 +68,11 @@ const Shifts = () => {
       const response = await shiftService.getAllShifts();
       if (response.data) {
         const allShifts = Array.isArray(response.data) ? response.data : [];
-        // Filter out delivery employees - only show non-delivery shifts in general schedule
-        const nonDeliveryShifts = allShifts.filter(shift => {
-          const employeePosition = shift.employee?.position?.name || '';
-          return !employeePosition.toLowerCase().includes('domicili');
-        });
-        setShifts(nonDeliveryShifts);
+        // Filtrar solo turnos de domiciliarios (empleados con posición Domiciliario)
+        const deliveryShifts = allShifts.filter(shift => 
+          shift.employee?.position?.name === 'Domiciliario'
+        );
+        setShifts(deliveryShifts);
       } else {
         console.error('Failed to load shifts:', response.message);
         alert('Error al cargar turnos: ' + (response.message || 'Error desconocido'));
@@ -92,13 +89,14 @@ const Shifts = () => {
     try {
       const response = await employeeService.getAllEmployees();
       if (response.data) {
-        // Filter out delivery employees - only show non-delivery employees in general schedule
         const allEmployees = Array.isArray(response.data) ? response.data : [];
-        const nonDeliveryEmployees = allEmployees.filter(emp => {
-          const employeePosition = emp.position?.name || '';
-          return !employeePosition.toLowerCase().includes('domicili');
-        });
-        setEmployees(nonDeliveryEmployees);
+        // Solo mostrar empleados con posición Domiciliario (insensible a mayúsculas)
+        const deliveryEmployees = allEmployees.filter(emp => 
+          emp.position?.name && emp.position.name.toLowerCase().includes('domicili')
+        );
+        console.log('Cargando empleados Domiciliarios:', deliveryEmployees.length);
+        console.log('Posiciones disponibles:', [...new Set(allEmployees.map(e => e.position?.name).filter(Boolean))]);
+        setEmployees(deliveryEmployees);
       } else {
         console.error('Failed to load employees:', response.message);
       }
@@ -124,13 +122,12 @@ const Shifts = () => {
     try {
       const response = await shiftTypeService.getAllShiftTypes();
       if (response.data) {
-        // Filter out delivery-specific shift types - only show general shift types
-        const allShiftTypes = Array.isArray(response.data) ? response.data : [];
-        const generalShiftTypes = allShiftTypes.filter(type => {
-          const typeName = type.name || '';
-          return !typeName.toLowerCase().includes('domicili');
-        });
-        setShiftTypes(generalShiftTypes);
+        const allTypes = Array.isArray(response.data) ? response.data : [];
+        // Solo mostrar tipos de turno de domiciliarios
+        const deliveryTypes = allTypes.filter(type => 
+          type.name?.includes('Domiciliario')
+        );
+        setShiftTypes(deliveryTypes);
       } else {
         console.error('Failed to load shift types:', response.message);
       }
@@ -182,7 +179,7 @@ const Shifts = () => {
     try {
       const shiftsToCreate = [];
       const current = new Date(start);
-      
+       
       while (current <= end) {
         shiftsToCreate.push({
           date: current.toISOString().split('T')[0],
@@ -265,7 +262,7 @@ const Shifts = () => {
 
   const columns = [
     { key: 'date', header: 'Fecha', render: (value) => value ? value.split('-').reverse().join('/') : '' },
-    { key: 'employee', header: 'Empleado', render: (value) => value ? `${value.firstName} ${value.lastName}` : 'Sin empleado' },
+    { key: 'employee', header: 'Domiciliario', render: (value) => value ? `${value.firstName} ${value.lastName}` : 'Sin empleado' },
     { key: 'location', header: 'Ubicación', render: (value) => value?.name || 'Sin ubicación' },
     { key: 'shiftType', header: 'Tipo de Turno', render: (value) => value?.name || 'Sin tipo' },
     { key: 'notes', header: 'Notas' }
@@ -277,23 +274,18 @@ const Shifts = () => {
 
   const exportToExcel = () => {
     const dataToExport = viewMode === 'calendar' ? filteredShifts : shifts;
-    exportShiftsToExcel(dataToExport, 'turnos');
+    exportShiftsToExcel(dataToExport, 'turnos_domiciliarios');
   };
-
-
-
 
   const renderCalendar = () => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
     const days = [];
 
-    // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfMonth; i++) {
       days.push(<div key={`empty-${i}`} className="h-24 border border-gray-200 bg-gray-50"></div>);
     }
 
-    // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const dayShifts = filteredShifts
@@ -312,14 +304,14 @@ const Shifts = () => {
               <div className="text-sm text-gray-500 italic text-center py-4">Sin turnos</div>
             ) : (
               dayShifts.map((shift) => (
-                <div key={shift.id} className="text-xs bg-gradient-to-r from-blue-100 to-blue-200 text-blue-900 rounded-md px-2 py-1.5 border border-blue-300 shadow-sm">
-                  <div className="font-semibold truncate text-blue-950">
+                <div key={shift.id} className="text-xs bg-gradient-to-r from-green-100 to-green-200 text-green-900 rounded-md px-2 py-1.5 border border-green-300 shadow-sm">
+                  <div className="font-semibold truncate text-green-950">
                     {shift.employee?.firstName} {shift.employee?.lastName}
                   </div>
-                  <div className="text-blue-800 truncate font-medium">
+                  <div className="text-green-800 truncate font-medium">
                     {shift.shiftType?.name}
                   </div>
-                  <div className="text-blue-700 text-xs font-mono">
+                  <div className="text-green-700 text-xs font-mono">
                     {shift.shiftType?.startTime?.slice(0, 5)} - {shift.shiftType?.endTime?.slice(0, 5)}
                   </div>
                 </div>
@@ -337,12 +329,11 @@ const Shifts = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Turnos</h1>
-          <p className="text-gray-600 mt-1">Administra los turnos de los empleados</p>
+          <h1 className="text-3xl font-bold text-gray-900">🛵 Turnos Domiciliarios</h1>
+          <p className="text-gray-600 mt-1">Administra los turnos de los domiciliarios</p>
         </div>
       </div>
 
-      {/* View Toggle and Filters */}
       <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
         <div className="flex flex-wrap gap-4 items-center mb-4">
           <div className="flex space-x-2">
@@ -350,7 +341,7 @@ const Shifts = () => {
               onClick={() => setViewMode('table')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 viewMode === 'table'
-                  ? 'bg-red-500 text-white'
+                  ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -360,7 +351,7 @@ const Shifts = () => {
               onClick={() => setViewMode('calendar')}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 viewMode === 'calendar'
-                  ? 'bg-red-500 text-white'
+                  ? 'bg-green-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -378,20 +369,6 @@ const Shifts = () => {
             >
               Crear Turnos en Serie
             </button>
-            {viewMode === 'calendar' && (
-              <button
-                onClick={() => {
-                  if (!selectedLocation) {
-                    alert('Por favor selecciona una ubicación para descargar el calendario.');
-                    return;
-                  }
-                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, selectedLocation);
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Descargar PDF
-              </button>
-            )}
           </div>
 
           {viewMode === 'calendar' && (
@@ -399,7 +376,7 @@ const Shifts = () => {
               <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600"
               >
                 <option value="">Todas las ubicaciones</option>
                 {locations.map(location => (
@@ -456,13 +433,13 @@ const Shifts = () => {
             onDelete={handleDelete}
             addButtonText="Agregar Turno"
             searchPlaceholder="Buscar turnos..."
-            emptyMessage="No hay turnos registrados en el sistema"
+            emptyMessage="No hay turnos de domiciliarios registrados"
           />
         ) : (
           <div className="bg-white">
             <div ref={calendarRef} className="grid grid-cols-7 gap-2 border border-gray-300 rounded-lg overflow-hidden shadow-lg">
               {['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'].map(day => (
-                <div key={day} className="p-4 bg-gradient-to-b from-blue-600 to-blue-700 border-b border-blue-800 text-center font-bold text-white shadow-md">
+                <div key={day} className="p-4 bg-gradient-to-b from-green-600 to-green-700 border-b border-green-800 text-center font-bold text-white shadow-md">
                   {day}
                 </div>
               ))}
@@ -489,23 +466,23 @@ const Shifts = () => {
               value={formData.date}
               onChange={(e) => setFormData({...formData, date: e.target.value})}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-2">
-                Empleado
+                Domiciliario
               </label>
               <select
                 id="employeeId"
                 value={formData.employeeId}
                 onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
               >
-                <option value="">Seleccionar empleado</option>
+                <option value="">Seleccionar domiciliarios</option>
                 {employees.map(employee => (
                   <option key={employee.id} value={employee.id}>
                     {employee.firstName} {employee.lastName}
@@ -522,12 +499,12 @@ const Shifts = () => {
                 value={formData.locationId}
                 onChange={(e) => setFormData({...formData, locationId: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
               >
                 <option value="">Seleccionar ubicación</option>
                 {locations.map(location => (
                   <option key={location.id} value={location.id}>
-                    {location.name} ({location.company?.name})
+                    {location.name}
                   </option>
                 ))}
               </select>
@@ -543,12 +520,12 @@ const Shifts = () => {
               value={formData.shiftTypeId}
               onChange={(e) => setFormData({...formData, shiftTypeId: e.target.value})}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
             >
               <option value="">Seleccionar tipo de turno</option>
               {shiftTypes.map(shiftType => (
                 <option key={shiftType.id} value={shiftType.id}>
-                  {shiftType.name} ({shiftType.startTime} - {shiftType.endTime})
+                  {shiftType.name} ({shiftType.startTime?.slice(0, 5)} - {shiftType.endTime?.slice(0, 5)})
                 </option>
               ))}
             </select>
@@ -563,30 +540,29 @@ const Shifts = () => {
               value={formData.notes}
               onChange={(e) => setFormData({...formData, notes: e.target.value})}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
-              placeholder="Notas adicionales del turno"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setModalOpen(false)}
-              className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 font-medium"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
             >
-              {editingShift ? 'Actualizar' : 'Crear'} Turno
+              {editingShift ? 'Actualizar' : 'Crear'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Bulk Shift Creation Modal */}
+      {/* Bulk Create Modal */}
       <Modal
         isOpen={bulkModalOpen}
         onClose={() => setBulkModalOpen(false)}
@@ -597,7 +573,7 @@ const Shifts = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha Inicio *
+                Fecha Inicio
               </label>
               <input
                 type="date"
@@ -605,12 +581,12 @@ const Shifts = () => {
                 value={bulkFormData.startDate}
                 onChange={(e) => setBulkFormData({...bulkFormData, startDate: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
               />
             </div>
             <div>
               <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Fecha Fin *
+                Fecha Fin
               </label>
               <input
                 type="date"
@@ -618,7 +594,7 @@ const Shifts = () => {
                 value={bulkFormData.endDate}
                 onChange={(e) => setBulkFormData({...bulkFormData, endDate: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
               />
             </div>
           </div>
@@ -626,16 +602,16 @@ const Shifts = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="bulkEmployeeId" className="block text-sm font-medium text-gray-700 mb-2">
-                Empleado *
+                Domiciliario
               </label>
               <select
                 id="bulkEmployeeId"
                 value={bulkFormData.employeeId}
                 onChange={(e) => setBulkFormData({...bulkFormData, employeeId: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
               >
-                <option value="">Seleccionar empleado</option>
+                <option value="">Seleccionar domiciliarios</option>
                 {employees.map(employee => (
                   <option key={employee.id} value={employee.id}>
                     {employee.firstName} {employee.lastName}
@@ -645,19 +621,19 @@ const Shifts = () => {
             </div>
             <div>
               <label htmlFor="bulkLocationId" className="block text-sm font-medium text-gray-700 mb-2">
-                Ubicación *
+                Ubicación
               </label>
               <select
                 id="bulkLocationId"
                 value={bulkFormData.locationId}
                 onChange={(e) => setBulkFormData({...bulkFormData, locationId: e.target.value})}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
               >
                 <option value="">Seleccionar ubicación</option>
                 {locations.map(location => (
                   <option key={location.id} value={location.id}>
-                    {location.name} ({location.company?.name})
+                    {location.name}
                   </option>
                 ))}
               </select>
@@ -666,19 +642,19 @@ const Shifts = () => {
 
           <div>
             <label htmlFor="bulkShiftTypeId" className="block text-sm font-medium text-gray-700 mb-2">
-              Tipo de Turno *
+              Tipo de Turno
             </label>
             <select
               id="bulkShiftTypeId"
               value={bulkFormData.shiftTypeId}
               onChange={(e) => setBulkFormData({...bulkFormData, shiftTypeId: e.target.value})}
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
             >
               <option value="">Seleccionar tipo de turno</option>
               {shiftTypes.map(shiftType => (
                 <option key={shiftType.id} value={shiftType.id}>
-                  {shiftType.name} ({shiftType.startTime} - {shiftType.endTime})
+                  {shiftType.name} ({shiftType.startTime?.slice(0, 5)} - {shiftType.endTime?.slice(0, 5)})
                 </option>
               ))}
             </select>
@@ -693,48 +669,36 @@ const Shifts = () => {
               value={bulkFormData.notes}
               onChange={(e) => setBulkFormData({...bulkFormData, notes: e.target.value})}
               rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
-              placeholder="Notas adicionales para todos los turnos"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
             />
           </div>
 
-          {/* Preview of shifts to be created */}
-          {bulkFormData.startDate && bulkFormData.endDate && (
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-              <h4 className="font-medium text-purple-900 mb-2">
-                Vista Previa de Turnos a Crear
-              </h4>
-              <div className="text-sm text-purple-700">
-                {getBulkShiftsPreview().length} turnos serán creados
-              </div>
-              <div className="mt-2 max-h-32 overflow-y-auto text-xs text-purple-600">
-                {getBulkShiftsPreview().slice(0, 10).map((shift, idx) => (
-                  <div key={idx} className="py-1">
-                    {shift.date}
-                  </div>
+          {getBulkShiftsPreview().length > 0 && (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-2">
+                Se crearán {getBulkShiftsPreview().length} turnos
+              </p>
+              <div className="text-xs text-gray-500 max-h-32 overflow-y-auto">
+                {getBulkShiftsPreview().map((shift, idx) => (
+                  <div key={idx}>{shift.date}</div>
                 ))}
-                {getBulkShiftsPreview().length > 10 && (
-                  <div className="py-1 italic">
-                    ... y {getBulkShiftsPreview().length - 10} más
-                  </div>
-                )}
               </div>
             </div>
           )}
 
-          <div className="flex justify-end space-x-3 pt-4">
+          <div className="flex justify-end space-x-3">
             <button
               type="button"
               onClick={() => setBulkModalOpen(false)}
-              className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 font-medium"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
             >
-              Crear {getBulkShiftsPreview().length > 0 ? getBulkShiftsPreview().length : ''} Turnos
+              Crear Turnos
             </button>
           </div>
         </form>
@@ -743,4 +707,4 @@ const Shifts = () => {
   );
 };
 
-export default Shifts;
+export default DeliveryShifts;

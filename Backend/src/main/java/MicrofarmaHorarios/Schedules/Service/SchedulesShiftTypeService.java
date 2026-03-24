@@ -104,17 +104,24 @@ public class SchedulesShiftTypeService extends ASchedulesBaseService<ShiftType> 
         try {
             shiftType.setStatus(true);
             
+            // If there are time ranges, we need to handle them BEFORE saving the shift type
+            // to avoid the cascade trying to save them with null shift_type_id
+            List<ShiftTimeRange> originalTimeRanges = null;
+            if (shiftType.getTimeRanges() != null && !shiftType.getTimeRanges().isEmpty()) {
+                originalTimeRanges = new ArrayList<>(shiftType.getTimeRanges());
+                // Clear the time ranges from the entity to avoid cascade issues
+                shiftType.getTimeRanges().clear();
+            }
+            
             // Save the shift type first to get the ID
             ShiftType savedShiftType = shiftTypeRepository.save(shiftType);
             
-            // If there are time ranges, save them with the shift type reference
-            if (shiftType.getTimeRanges() != null && !shiftType.getTimeRanges().isEmpty()) {
-                List<ShiftTimeRange> rangesToSave = new ArrayList<>();
-                for (ShiftTimeRange range : shiftType.getTimeRanges()) {
-                    range.setShiftType(savedShiftType);
-                    rangesToSave.add(range);
+            // Now add the time ranges with the proper reference
+            if (originalTimeRanges != null && !originalTimeRanges.isEmpty()) {
+                for (ShiftTimeRange range : originalTimeRanges) {
+                    savedShiftType.addTimeRange(range.getStartTime(), range.getEndTime(), range.getRangeOrder());
                 }
-                shiftTimeRangeRepository.saveAll(rangesToSave);
+                shiftTypeRepository.save(savedShiftType);
             }
             
             return savedShiftType;

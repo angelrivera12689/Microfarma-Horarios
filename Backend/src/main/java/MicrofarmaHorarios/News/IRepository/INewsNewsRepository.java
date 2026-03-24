@@ -16,4 +16,6 @@ public interface INewsNewsRepository extends INewsBaseRepository<News, String> {
 
     List<News> findByPublicationDateBetween(LocalDate startDate, LocalDate endDate);
 
+    List<News> findByPublicationDateAndNewsTypeId(LocalDate publicationDate, String newsTypeId);
+
 }

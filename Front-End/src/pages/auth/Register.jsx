@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import authService from '../../services/authService';
+import logo from '../../assets/logo.png';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -86,11 +87,11 @@ const Register = () => {
       <div className="max-w-md w-full">
         {/* Logo and Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-green-500 to-green-600 rounded-full shadow-lg mb-4">
-            <span className="text-3xl text-white font-bold">M</span>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Microfarma</h1>
-          <p className="text-gray-600">Sistema de Gestión Empresarial</p>
+          <img 
+            src={logo} 
+            alt="Microfarma Logo" 
+            className="w-64 h-64 mx-auto object-contain"
+          />
         </div>
 
         {/* Register Form */}

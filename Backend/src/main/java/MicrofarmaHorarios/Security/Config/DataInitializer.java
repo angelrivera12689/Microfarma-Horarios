@@ -20,6 +20,8 @@ import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesContractType
 import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesEmployeeLocationRepository;
 import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesEmployeeRepository;
 import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesPositionRepository;
+import MicrofarmaHorarios.News.Entity.NewsType;
+import MicrofarmaHorarios.News.IRepository.INewsNewsTypeRepository;
 import MicrofarmaHorarios.Organization.Entity.Company;
 import MicrofarmaHorarios.Organization.Entity.Location;
 import MicrofarmaHorarios.Organization.IRepository.IOrganizationCompanyRepository;
@@ -91,6 +93,14 @@ public class DataInitializer implements CommandLineRunner {
     @Autowired
     private ISchedulesShiftTypeRepository shiftTypeRepository;
 
+    @Autowired
+    private INewsNewsTypeRepository newsTypeRepository;
+
+    // ==================== DATOS DE EJEMPLO PARA ALERTAS ====================
+    // Estos datos se usan para generar alertas de cumpleaños y contratos
+    // Hoy es: 2026-03-20
+    private static final LocalDate TODAY = LocalDate.of(2026, 3, 20);
+
     // ==================== DATOS DE LA EMPRESA ====================
     
     private static final String COMPANY_NAME = "DROGUERIAS MICROFARMA S.A.S";
@@ -144,6 +154,10 @@ public class DataInitializer implements CommandLineRunner {
             // Paso 8: Crear administrador del sistema
             createSystemAdministrator();
             logger.info("✓ Administrador del sistema verificado/creado");
+
+            // Paso 9: Inicializar tipos de noticia para alertas
+            initializeNewsTypes();
+            logger.info("✓ Tipos de noticia para alertas inicializados");
 
             logger.info("=========================================================");
             logger.info("INICIALIZACIÓN COMPLETADA EXITOSAMENTE");
@@ -457,63 +471,65 @@ public class DataInitializer implements CommandLineRunner {
         logger.info("[7/8] Inicializando empleados y usuarios...");
 
         // Datos de empleados extraídos del PDF
+        // Formato: firstName, lastName, email, position, contractType, location, birthDate(MM-dd), contractEndDate(yyyy-MM-dd o null)
+        // Para pruebas de alertas: birthday 03-20 = hoy, contractEndDate cerca de hoy = alertas
         String[][] employeeData = {
-            // PINOS - 4 empleados
-            {"Yilver", "", "yilver@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS"},
-            {"Stephania", "", "stephania@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS"},
-            {"Juan Manuel", "", "juan.manuel@microfarma.com", "CAJERO", "TÉRMINO FIJO", "PINOS"},
-            {"Marly", "", "marly@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "PINOS"},
+            // PINOS - 4 empleados (1 con cumpleaños hoy, 1 con contrato por vencer)
+            {"Yilver", "", "yilver@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS", "05-15", "2027-06-20"},
+            {"Stephania", "", "stephania@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS", "03-20", "2027-03-20"},  // ¡CUMPLEAÑOS HOY!
+            {"Juan Manuel", "", "juan.manuel@microfarma.com", "CAJERO", "TÉRMINO FIJO", "PINOS", "08-22", "2026-04-10"},  // Contrato por vencer
+            {"Marly", "", "marly@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "PINOS", "11-03", null},  // Indefinido
             
-            // IPANEMA - 4 empleados (incluye Cristo Jesus*)
-            {"Keara", "", "keara@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA"},
-            {"Brayan Gonzalez", "", "brayan.gonzalez@microfarma.com", "CAJERO", "TÉRMINO INDEFINIDO", "IPANEMA"},
-            {"Laura Sofia", "", "laura.sofia@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "IPANEMA"},
-            {"Cristo Jesus", "", "cristo.jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA"},
+            // IPANEMA - 4 empleados (1 con contrato vencido)
+            {"Keara", "", "keara@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA", "01-10", "2027-01-10"},
+            {"Brayan Gonzalez", "", "brayan.gonzalez@microfarma.com", "CAJERO", "TÉRMINO INDEFINIDO", "IPANEMA", "06-25", null},
+            {"Laura Sofia", "", "laura.sofia@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "IPANEMA", "12-01", "2026-03-01"},  // Contrato vencido
+            {"Cristo Jesus", "", "cristo.jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA", "09-18", "2027-09-18"},
             
             // GUALANDAY - 2 empleados
-            {"Joselito Bernal", "", "joselito.bernal@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "GUALANDAY"},
-            {"Karol", "", "karol@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GUALANDAY"},
+            {"Joselito Bernal", "", "joselito.bernal@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "GUALANDAY", "04-05", null},
+            {"Karol", "", "karol@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GUALANDAY", "07-30", "2026-04-25"},  // Por vencer
             
             // BUGANVILES - 2 empleados
-            {"Daniela Meñaca", "", "daniela.menaca@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BUGANVILES"},
-            {"Luisa", "", "luisa@microfarma.com", "CAJERO", "TÉRMINO FIJO", "BUGANVILES"},
+            {"Daniela Meñaca", "", "daniela.menaca@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BUGANVILES", "02-14", "2025-12-15"},  // Vencido
+            {"Luisa", "", "luisa@microfarma.com", "CAJERO", "TÉRMINO FIJO", "BUGANVILES", "10-20", "2027-10-20"},
             
             // BAMBU - 2 empleados
-            {"Jilber", "", "jilber@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BAMBU"},
-            {"Leidy Bustos", "", "leidy.bustos@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "BAMBU"},
+            {"Jilber", "", "jilber@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BAMBU", "03-15", "2026-04-05"},  // Por vencer
+            {"Leidy Bustos", "", "leidy.bustos@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "BAMBU", "05-22", "2027-05-22"},
             
             // LIMONAR - 2 empleados
-            {"Alejandro Hermosa", "", "alejandro.hermosa@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "LIMONAR"},
-            {"Melba", "", "melba@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "LIMONAR"},
+            {"Alejandro Hermosa", "", "alejandro.hermosa@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "LIMONAR", "08-08", null},
+            {"Melba", "", "melba@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "LIMONAR", "11-11", "2026-02-20"},  // Vencido
             
             // MANZANAREZ - 3 empleados
-            {"Karla", "", "karla@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MANZANAREZ"},
-            {"Jhon", "", "jhon@microfarma.com", "CAJERO", "TÉRMINO FIJO", "MANZANAREZ"},
-            {"Yesica Serrato", "", "yesica.serrato@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MANZANAREZ"},
+            {"Karla", "", "karla@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MANZANAREZ", "01-25", "2027-01-25"},
+            {"Jhon", "", "jhon@microfarma.com", "CAJERO", "TÉRMINO FIJO", "MANZANAREZ", "06-10", "2026-04-18"},  // Por vencer
+            {"Yesica Serrato", "", "yesica.serrato@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MANZANAREZ", "12-31", "2027-12-31"},
             
             // MIRA RIO - 2 empleados
-            {"Jesus", "", "jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MIRA RIO"},
-            {"Yessica", "", "yessica@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MIRA RIO"},
+            {"Jesus", "", "jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MIRA RIO", "04-12", "2027-04-12"},
+            {"Yessica", "", "yessica@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MIRA RIO", "03-21", "2026-04-08"},  // Por vencer, birthday mañana
             
             // CAÑA BRAVA - 2 empleados
-            {"Daniela Mosquera", "", "daniela.mosquera@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "CAÑA BRAVA"},
-            {"Sergio Sosa", "", "sergio.sosa@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "CAÑA BRAVA"},
+            {"Daniela Mosquera", "", "daniela.mosquera@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "CAÑA BRAVA", "07-07", "2027-07-07"},
+            {"Sergio Sosa", "", "sergio.sosa@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "CAÑA BRAVA", "10-15", "2026-01-10"},  // Vencido
             
             // RIVERA - 2 empleados
-            {"Mildred", "", "mildred@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "RIVERA"},
-            {"Yurani", "", "yurani@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "RIVERA"},
+            {"Mildred", "", "mildred@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "RIVERA", "02-28", "2027-02-28"},
+            {"Yurani", "", "yurani@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "RIVERA", "09-09", "2026-04-01"},  // Por vencer
             
             // ZULUAGA - 2 empleados
-            {"Cindy", "", "cindy@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "ZULUAGA"},
-            {"Miguel", "", "miguel@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "ZULUAGA"},
+            {"Cindy", "", "cindy@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "ZULUAGA", "03-19", "2027-03-19"},  // Birthday ayer
+            {"Miguel", "", "miguel@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "ZULUAGA", "05-05", "2027-05-05"},
             
             // GIGANTE - 3 empleados
-            {"Yudi", "", "yudi@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GIGANTE"},
-            {"Karoline", "", "karoline@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "GIGANTE"},
-            {"Johan", "", "johan@microfarma.com", "CAJERO", "TÉRMINO FIJO", "GIGANTE"},
+            {"Yudi", "", "yudi@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GIGANTE", "11-22", "2026-03-25"},  // Por vencer
+            {"Karoline", "", "karoline@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "GIGANTE", "01-30", "2027-01-30"},
+            {"Johan", "", "johan@microfarma.com", "CAJERO", "TÉRMINO FIJO", "GIGANTE", "08-14", "2025-11-30"},  // Vencido
             
             // DANIEL CALDERÓN - RH (Administrador)
-            {"Daniel", "Calderón", "daniel.calderon@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "PINOS"},
+            {"Daniel", "Calderón", "daniel.calderon@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "PINOS", "03-20", null},  // ¡CUMPLEAÑOS HOY!
         };
 
         int successCount = 0;
@@ -527,6 +543,8 @@ public class DataInitializer implements CommandLineRunner {
                 String positionName = empData[3];
                 String contractTypeName = empData[4];
                 String locationName = empData[5];
+                String birthDateStr = empData[6];  // MM-dd format
+                String contractEndDateStr = empData[7];  // yyyy-MM-dd or null
 
                 Location location = locations.stream()
                     .filter(l -> l.getName().equals(locationName))
@@ -539,9 +557,36 @@ public class DataInitializer implements CommandLineRunner {
                     continue;
                 }
 
-                createEmployeeAndUser(firstName, lastName, email, positionName, contractTypeName, location);
+                // Parse birth date (MM-dd format, year doesn't matter for birthday alerts)
+                LocalDate birthDate = null;
+                if (birthDateStr != null && !birthDateStr.isEmpty()) {
+                    try {
+                        String[] parts = birthDateStr.split("-");
+                        int month = Integer.parseInt(parts[0]);
+                        int day = Integer.parseInt(parts[1]);
+                        birthDate = LocalDate.of(2000, month, day);  // Year 2000 as placeholder
+                    } catch (Exception e) {
+                        logger.warn("    Fecha de nacimiento inválida '{}' para {}", birthDateStr, firstName);
+                    }
+                }
+
+                // Parse contract end date
+                LocalDate contractEndDate = null;
+                if (contractEndDateStr != null && !contractEndDateStr.isEmpty() && !contractEndDateStr.equals("null")) {
+                    try {
+                        contractEndDate = LocalDate.parse(contractEndDateStr);
+                    } catch (Exception e) {
+                        logger.warn("    Fecha de fin de contrato inválida '{}' para {}", contractEndDateStr, firstName);
+                    }
+                }
+
+                createEmployeeAndUser(firstName, lastName, email, positionName, contractTypeName, location, birthDate, contractEndDate);
                 successCount++;
-                logger.debug("  - Empleado '{} {}' creado en {}", firstName, lastName, locationName);
+                
+                // Log birthday/contract info for debugging
+                String birthdayMsg = birthDate != null ? " [CUMPLE: " + birthDateStr + "]" : "";
+                String contractMsg = contractEndDate != null ? " [CONTRATO: " + contractEndDateStr + "]" : " [CONTRATO: indefinido]";
+                logger.info("  - Empleado '{} {}' creado en {}{}{}", firstName, lastName, locationName, birthdayMsg, contractMsg);
                 
             } catch (Exception e) {
                 logger.error("    Error al crear empleado {}: {}", empData[0], e.getMessage());
@@ -556,7 +601,8 @@ public class DataInitializer implements CommandLineRunner {
      * Crea un empleado y su usuario asociado
      */
     private void createEmployeeAndUser(String firstName, String lastName, String email, 
-            String positionName, String contractTypeName, Location location) throws Exception {
+            String positionName, String contractTypeName, Location location, 
+            LocalDate birthDate, LocalDate contractEndDate) throws Exception {
         
         // Obtener cargo
         Position position = positionRepository.findFirstByNameIgnoreCase(positionName)
@@ -582,7 +628,9 @@ public class DataInitializer implements CommandLineRunner {
             employee.setEmail(email);
             employee.setPosition(position);
             employee.setContractType(contractType);
-            employee.setHireDate(LocalDate.now());
+            employee.setHireDate(TODAY.minusMonths(6));  // Fecha de contratación 6 meses antes
+            employee.setBirthDate(birthDate);  // Fecha de nacimiento para alertas de cumpleaños
+            employee.setContractEndDate(contractEndDate);  // Fecha de fin de contrato
             employee.setStatus(true);
             
             employee = employeeRepository.save(employee);
@@ -665,5 +713,36 @@ public class DataInitializer implements CommandLineRunner {
         userService.save(adminUser);
         logger.info("    Administrador del sistema creado: {}", adminEmail);
         logger.info("    NOTA: Por seguridad, cambie la contraseña en el primer inicio de sesión");
+    }
+
+    /**
+     * Inicializa los tipos de noticia para alertas automáticas
+     * Estos tipos son usados por el sistema de alertas automáticas
+     */
+    private void initializeNewsTypes() throws Exception {
+        logger.info("[9/9] Inicializando tipos de noticia para alertas...");
+
+        // Tipos de noticia para alertas
+        createNewsTypeIfNotExists("CUMPLEAÑOS", "Alertas de cumpleaños de empleados");
+        createNewsTypeIfNotExists("CONTRATO_POR_VENCER", "Alertas de contratos por vencer");
+        createNewsTypeIfNotExists("CONTRATO_VENCIDO", "Alertas de contratos vencidos");
+
+        logger.info("    Tipos de noticia para alertas completados: 3");
+    }
+
+    /**
+     * Crea un tipo de noticia si no existe
+     */
+    private void createNewsTypeIfNotExists(String name, String description) throws Exception {
+        if (newsTypeRepository.findByNameIgnoreCase(name).isPresent()) {
+            logger.debug("    El tipo de noticia '{}' ya existe", name);
+            return;
+        }
+
+        NewsType newsType = new NewsType();
+        newsType.setName(name);
+        newsType.setDescription(description);
+        newsTypeRepository.save(newsType);
+        logger.info("    Nuevo tipo de noticia: {} | {}", name, description);
     }
 }

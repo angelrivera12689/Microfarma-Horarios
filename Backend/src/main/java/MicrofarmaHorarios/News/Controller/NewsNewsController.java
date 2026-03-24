@@ -19,6 +19,7 @@ import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
 import MicrofarmaHorarios.News.Entity.News;
 import MicrofarmaHorarios.News.IService.INewsNewsService;
+import MicrofarmaHorarios.News.Service.AlertGenerationService;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
 
 import java.util.Optional;
@@ -29,6 +30,9 @@ public class NewsNewsController extends ANewsBaseController<News, INewsNewsServi
 
     @Autowired
     private IHumanResourcesEmployeeService employeeService;
+
+    @Autowired
+    private AlertGenerationService alertGenerationService;
 
     public NewsNewsController(INewsNewsService service) {
         super(service, "News");
@@ -86,6 +90,22 @@ public class NewsNewsController extends ANewsBaseController<News, INewsNewsServi
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(new ApiResponseDto<List<News>>(e.getMessage(), null, false));
+        }
+    }
+
+    /**
+     * Endpoint manual para generar alertas de cumpleaños y contratos
+     * Uso: POST /api/news/news/generate-alerts
+     */
+    @GetMapping("/generate-alerts")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('GERENTE_SUCURSAL')")
+    public ResponseEntity<ApiResponseDto<String>> generateAlerts() {
+        try {
+            alertGenerationService.generateDailyAlerts();
+            return ResponseEntity.ok(new ApiResponseDto<String>("Alertas generadas exitosamente", "OK", true));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponseDto<String>("Error al generar alertas: " + e.getMessage(), null, false));
         }
     }
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import logo from '../assets/logo.png';
 
 const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
   const [openSections, setOpenSections] = useState({});
@@ -71,6 +72,14 @@ const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
       items: [
         { name: 'Email', path: 'notifications/email' }
       ]
+    },
+    {
+      name: 'Domiciliarios',
+      icon: '🛵',
+      items: [
+        { name: 'Turnos', path: 'delivery/shifts' },
+        { name: 'Reportes', path: 'delivery/reports' }
+      ]
     }
   ];
 
@@ -83,14 +92,12 @@ const Sidebar = ({ className = '', 'aria-hidden': ariaHidden }) => {
     >
       <div className="p-6">
         {/* Logo Section */}
-        <div className="flex items-center space-x-3 mb-8">
-          <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white font-bold text-lg">M</span>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">Microfarma</h2>
-            <p className="text-sm text-slate-500">Panel Admin</p>
-          </div>
+        <div className="flex items-center justify-center mb-8">
+          <img 
+            src={logo} 
+            alt="Microfarma Logo" 
+            className="w-40 h-40 object-contain"
+          />
         </div>
 
         {/* Navigation */}

@@ -4,17 +4,23 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.HumanResources.Service.HumanResourcesEmployeeService;
+import MicrofarmaHorarios.News.Service.AlertGenerationService;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
 import MicrofarmaHorarios.Schedules.Service.SchedulesShiftService;
 
 @Component
-public class NotificationScheduler {
+public class NotificationScheduler implements CommandLineRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(NotificationScheduler.class);
 
     @Autowired
     private EmailService emailService;
@@ -24,6 +30,9 @@ public class NotificationScheduler {
 
     @Autowired
     private HumanResourcesEmployeeService employeeService;
+
+    @Autowired
+    private AlertGenerationService alertGenerationService;
 
     // Send shift reminders 24 hours before (runs daily at 9 AM)
     @Scheduled(cron = "0 0 9 * * ?")
@@ -88,6 +97,32 @@ public class NotificationScheduler {
             }
         } catch (Exception e) {
             // Log error but continue
+        }
+    }
+
+    // Generate automatic news alerts for birthdays, contract expiring and expired (runs daily at 7 AM)
+    @Scheduled(cron = "0 0 7 * * ?")
+    public void generateNewsAlerts() {
+        logger.info("=========================================================");
+        logger.info("EJECUTANDO SCHEDULER DE ALERTAS AUTOMÁTICAS");
+        logger.info("=========================================================");
+        try {
+            alertGenerationService.generateDailyAlerts();
+        } catch (Exception e) {
+            logger.error("ERROR AL GENERAR ALERTAS AUTOMÁTICAS: {}", e.getMessage(), e);
+        }
+    }
+
+    // Run alerts on startup for testing/development
+    @Override
+    public void run(String... args) throws Exception {
+        logger.info("=========================================================");
+        logger.info("EJECUTANDO ALERTAS EN INICIO (MODO DESARROLLO)");
+        logger.info("=========================================================");
+        try {
+            alertGenerationService.generateDailyAlerts();
+        } catch (Exception e) {
+            logger.error("ERROR AL GENERAR ALERTAS EN INICIO: {}", e.getMessage(), e);
         }
     }
 }

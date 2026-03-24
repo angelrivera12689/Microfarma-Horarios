@@ -27,6 +27,8 @@ import MonthlyReport from './pages/DefaultHours/MonthlyReport';
 import News from './pages/news/News';
 import NewsTypes from './pages/news/NewsTypes';
 import Email from './pages/notifications/Email';
+import DeliveryShifts from './pages/delivery/DeliveryShifts';
+import DeliveryReports from './pages/delivery/DeliveryReports';
 import authService from './services/authService';
 
 // Protected Route Component
@@ -216,6 +218,8 @@ function App() {
           <Route path="news/news" element={<News />} />
           <Route path="news/types" element={<NewsTypes />} />
           <Route path="notifications/email" element={<Email />} />
+          <Route path="delivery/shifts" element={<DeliveryShifts />} />
+          <Route path="delivery/reports" element={<DeliveryReports />} />
         </Route>
 
         {/* Catch all route - redirect to dashboard if authenticated, login if not */}

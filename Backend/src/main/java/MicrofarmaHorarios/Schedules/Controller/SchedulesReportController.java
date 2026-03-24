@@ -1,6 +1,7 @@
 package MicrofarmaHorarios.Schedules.Controller;
 
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.format.TextStyle;
@@ -28,10 +29,12 @@ import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.io.image.ImageDataFactory;
 
 import MicrofarmaHorarios.Organization.Entity.Location;
 import MicrofarmaHorarios.Organization.IService.IOrganizationLocationService;
@@ -592,12 +595,30 @@ public class SchedulesReportController {
     // ==================== HELPER METHODS ====================
 
     private void addDocumentHeader(Document document, String title, int month, int year) {
-        Paragraph header = new Paragraph("Microfarma Horarios")
-                .setFontSize(24)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setMarginBottom(5)
-                .setFontColor(new DeviceRgb(200, 0, 0));
-        document.add(header);
+        try {
+            // Add logo image from classpath
+            try (InputStream is = getClass().getResourceAsStream("/logo.png")) {
+                if (is != null) {
+                    com.itextpdf.io.image.ImageData imageData = 
+                        com.itextpdf.io.image.ImageDataFactory.create(is.readAllBytes());
+                    Image logo = new Image(imageData);
+                    logo.setWidth(UnitValue.createPercentValue(30));
+                    logo.setMarginBottom(10);
+                    logo.setTextAlignment(TextAlignment.CENTER);
+                    document.add(logo);
+                } else {
+                    throw new Exception("Logo not found in classpath");
+                }
+            }
+        } catch (Exception e) {
+            // If logo not found, use text instead
+            Paragraph header = new Paragraph("Microfarma Horarios")
+                    .setFontSize(24)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginBottom(5)
+                    .setFontColor(new DeviceRgb(200, 0, 0));
+            document.add(header);
+        }
 
         Paragraph subtitle = new Paragraph("Sistema de Gestión de Horarios Laborales")
                 .setFontSize(12)

@@ -36,6 +36,9 @@ public class Employee extends AHumanResourcesBaseEntity {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Column(name = "contract_end_date")
+    private LocalDate contractEndDate;
+
     @Column(name = "address", length = 255)
     private String address;
 
