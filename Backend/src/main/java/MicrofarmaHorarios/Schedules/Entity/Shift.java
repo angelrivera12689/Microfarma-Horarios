@@ -7,13 +7,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Data;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.Organization.Entity.Location;
 
 @Entity
-@Table(name = "shift")
+@Table(name = "shift", uniqueConstraints = {
+    @UniqueConstraint(name = "uk_shift_employee_date", columnNames = {"employee_id", "date"})
+})
 @Data
 public class Shift extends ASchedulesBaseEntity {
     @Column(name = "date", nullable = false)

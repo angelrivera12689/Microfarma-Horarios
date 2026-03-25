@@ -47,9 +47,20 @@ const Reports = () => {
       console.log('Filters response:', response);
       // The response structure is { status: true, data: {...}, message: '...' }
       if (response && (response.success === true || response.status === true) && response.data) {
+        // Helper function to check if location is for delivery
+        const isDeliveryLocation = (locationName) => {
+          if (!locationName) return false;
+          const name = locationName.toLowerCase();
+          return name.includes('zona norte') || 
+                 name.includes('oriente') || 
+                 name.includes('sur');
+        };
+        
         setFilterOptions({
-          locations: response.data.locations || [],
-          employees: response.data.employees || [],
+          locations: (response.data.locations || []).filter(loc => !isDeliveryLocation(loc.name)),
+          employees: (response.data.employees || []).filter(emp => 
+            !emp.position || !emp.position.toLowerCase().includes('domicili')
+          ),
           years: response.data.years || [],
           statuses: response.data.statuses || []
         });
@@ -66,6 +77,15 @@ const Reports = () => {
 
   const loadReport = useCallback(async () => {
     setLoading(true);
+    // Helper function to check if location is for delivery
+    const isDeliveryLocation = (locationName) => {
+      if (!locationName) return false;
+      const name = locationName.toLowerCase();
+      return name.includes('zona norte') || 
+             name.includes('oriente') || 
+             name.includes('sur');
+    };
+    
     try {
       let response;
       
@@ -97,7 +117,37 @@ const Reports = () => {
         console.log('Report global:', response.data.global);
         console.log('Report employees:', response.data.employees);
         console.log('Report locations:', response.data.locations);
-        setReport(response.data);
+        
+        // Filter out delivery employees and locations from the report
+        const filteredEmployees = (response.data.employees || []).filter(emp => 
+          !emp.positionName || !emp.positionName.toLowerCase().includes('domicili')
+        );
+        
+        // Also filter out delivery locations from the report
+        const filteredLocations = (response.data.locations || []).filter(loc => 
+          !isDeliveryLocation(loc.locationName)
+        );
+        
+        // Recalculate global totals based on filtered employees
+        const filteredGlobal = response.data.global ? {
+          ...response.data.global,
+          totalEmployees: filteredEmployees.length,
+          totalHours: filteredEmployees.reduce((sum, e) => sum + (e.totalHours || 0), 0),
+          totalOvertimeHours: filteredEmployees.reduce((sum, e) => sum + (e.overtimeHours || 0), 0),
+          totalRegularHours: filteredEmployees.reduce((sum, e) => sum + (e.regularHours || 0), 0),
+          totalDiurnaExtraHours: filteredEmployees.reduce((sum, e) => sum + (e.diurnaExtraHours || 0), 0),
+          totalNocturnaExtraHours: filteredEmployees.reduce((sum, e) => sum + (e.nocturnaExtraHours || 0), 0),
+          totalDominicalHours: filteredEmployees.reduce((sum, e) => sum + (e.dominicalHours || 0), 0),
+          totalFestivoHours: filteredEmployees.reduce((sum, e) => sum + (e.festivoHours || 0), 0),
+          totalShifts: filteredEmployees.reduce((sum, e) => sum + (e.totalShifts || 0), 0)
+        } : null;
+        
+        setReport({
+          ...response.data,
+          employees: filteredEmployees,
+          locations: filteredLocations,
+          global: filteredGlobal
+        });
       } else {
         console.error('Error loading report:', response?.data?.message || response?.message || 'Unknown error');
       }

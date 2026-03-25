@@ -17,10 +17,13 @@ const DeliveryShifts = () => {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
   const [viewMode, setViewMode] = useState('table');
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const calendarRef = useRef();
+  
+  // Estado para mostrar advertencia de turno existente
+  const [existingShiftWarning, setExistingShiftWarning] = useState(null);
+  const [checkingShift, setCheckingShift] = useState(false);
   const [formData, setFormData] = useState({
     date: '',
     employeeId: '',
@@ -70,7 +73,7 @@ const DeliveryShifts = () => {
         const allShifts = Array.isArray(response.data) ? response.data : [];
         // Filtrar solo turnos de domiciliarios (empleados con posición Domiciliario)
         const deliveryShifts = allShifts.filter(shift => 
-          shift.employee?.position?.name === 'Domiciliario'
+          shift.employee?.position?.name && shift.employee.position.name.toLowerCase().includes('domicili')
         );
         setShifts(deliveryShifts);
       } else {
@@ -105,11 +108,25 @@ const DeliveryShifts = () => {
     }
   };
 
+  // Helper function to check if location is for delivery
+  const isDeliveryLocation = (locationName) => {
+    if (!locationName) return false;
+    const name = locationName.toLowerCase();
+    return name.includes('zona norte') || 
+           name.includes('oriente') || 
+           name.includes('sur');
+  };
+
   const loadLocations = async () => {
     try {
       const response = await locationService.getAllLocations();
       if (response.data) {
-        setLocations(Array.isArray(response.data) ? response.data : []);
+        // Filtrar solo ubicaciones de domiciliarios (Las Américas 3 Norte, Oriente, Sur)
+        const allLocations = Array.isArray(response.data) ? response.data : [];
+        const deliveryLocations = allLocations.filter(loc => 
+          isDeliveryLocation(loc.name)
+        );
+        setLocations(deliveryLocations);
       } else {
         console.error('Failed to load locations:', response.message);
       }
@@ -136,8 +153,48 @@ const DeliveryShifts = () => {
     }
   };
 
+  // Función para verificar si el empleado ya tiene un turno en la fecha seleccionada
+  const checkExistingShift = async (employeeId, date) => {
+    if (!employeeId || !date) {
+      setExistingShiftWarning(null);
+      return;
+    }
+    
+    setCheckingShift(true);
+    try {
+      const response = await shiftService.checkExistingShift(employeeId, date);
+      if (response.status && response.data) {
+        // Hay un turno existente - mostrar advertencia
+        setExistingShiftWarning({
+          message: response.message,
+          existingShift: response.data
+        });
+      } else {
+        setExistingShiftWarning(null);
+      }
+    } catch (error) {
+      console.error('Error checking existing shift:', error);
+      setExistingShiftWarning(null);
+    } finally {
+      setCheckingShift(false);
+    }
+  };
+
+  // Handler para cambio de empleado en el formulario
+  const handleEmployeeChange = (employeeId) => {
+    setFormData({...formData, employeeId});
+    checkExistingShift(employeeId, formData.date);
+  };
+
+  // Handler para cambio de fecha en el formulario
+  const handleDateChange = (date) => {
+    setFormData({...formData, date});
+    checkExistingShift(formData.employeeId, date);
+  };
+
   const handleAdd = () => {
     setEditingShift(null);
+    setExistingShiftWarning(null); // Limpiar advertencia al abrir modal
     setFormData({
       date: '',
       employeeId: '',
@@ -268,12 +325,8 @@ const DeliveryShifts = () => {
     { key: 'notes', header: 'Notas' }
   ];
 
-  const filteredShifts = selectedLocation
-    ? shifts.filter(shift => shift.location?.id == selectedLocation)
-    : shifts;
-
   const exportToExcel = () => {
-    const dataToExport = viewMode === 'calendar' ? filteredShifts : shifts;
+    const dataToExport = viewMode === 'calendar' ? shifts : shifts;
     exportShiftsToExcel(dataToExport, 'turnos_domiciliarios');
   };
 
@@ -288,7 +341,7 @@ const DeliveryShifts = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayShifts = filteredShifts
+      const dayShifts = shifts
         .filter(shift => shift.date?.startsWith(dateStr))
         .sort((a, b) => {
           const timeA = a.shiftType?.startTime || '00:00';
@@ -372,21 +425,8 @@ const DeliveryShifts = () => {
           </div>
 
           {viewMode === 'calendar' && (
-            <div className="flex items-center space-x-4">
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600"
-              >
-                <option value="">Todas las ubicaciones</option>
-                {locations.map(location => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.company?.name})
-                  </option>
-                ))}
-              </select>
-
-              <div className="flex items-center space-x-2">
+            <>
+            <div className="flex items-center space-x-2">
                 <button
                   onClick={() => {
                     if (currentMonth === 0) {
@@ -417,7 +457,7 @@ const DeliveryShifts = () => {
                   ›
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
 
@@ -464,23 +504,40 @@ const DeliveryShifts = () => {
               type="date"
               id="date"
               value={formData.date}
-              onChange={(e) => setFormData({...formData, date: e.target.value})}
+              onChange={(e) => {
+                setFormData({...formData, date: e.target.value});
+                handleDateChange(e.target.value);
+              }}
               required
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
             />
+            {/* Advertencia cuando ya existe un turno para esta fecha */}
+            {existingShiftWarning && (
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-amber-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm text-amber-800 font-medium">
+                    {existingShiftWarning.message}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+            <div className="relative">
               <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-2">
                 Domiciliario
               </label>
               <select
                 id="employeeId"
                 value={formData.employeeId}
-                onChange={(e) => setFormData({...formData, employeeId: e.target.value})}
+                onChange={(e) => handleEmployeeChange(e.target.value)}
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-green-600 transition-colors duration-200"
+                disabled={checkingShift}
               >
                 <option value="">Seleccionar domiciliarios</option>
                 {employees.map(employee => (
@@ -489,6 +546,11 @@ const DeliveryShifts = () => {
                   </option>
                 ))}
               </select>
+              {checkingShift && (
+                <div className="absolute right-3 top-9">
+                  <div className="animate-spin h-5 w-5 border-2 border-green-500 border-t-transparent rounded-full"></div>
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="locationId" className="block text-sm font-medium text-gray-700 mb-2">

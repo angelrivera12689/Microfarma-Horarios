@@ -293,6 +293,17 @@ public class SchedulesReportService implements ISchedulesReportService {
         String firstName = shifts.get(0).getEmployee().getFirstName() != null ? shifts.get(0).getEmployee().getFirstName() : "";
         String lastName = shifts.get(0).getEmployee().getLastName() != null ? shifts.get(0).getEmployee().getLastName() : "";
         String fullName = (firstName + " " + lastName).trim();
+        
+        // Obtener posición del empleado
+        String positionName = shifts.get(0).getEmployee().getPosition() != null ? 
+            shifts.get(0).getEmployee().getPosition().getName() : null;
+        
+        // Obtener ubicaciones donde trabaja el empleado
+        List<String> employeeLocations = shifts.stream()
+            .map(shift -> shift.getLocation() != null ? shift.getLocation().getName() : null)
+            .filter(name -> name != null)
+            .distinct()
+            .collect(Collectors.toList());
 
         return new EmployeeReportDto(
                 employeeId,
@@ -308,7 +319,10 @@ public class SchedulesReportService implements ISchedulesReportService {
                 dominicalHours,
                 festivoHours,
                 shifts.size(),
-                workingDays
+                workingDays,
+                positionName,
+                positionName,
+                employeeLocations
         );
     }
 
@@ -454,6 +468,9 @@ public class SchedulesReportService implements ISchedulesReportService {
             employeeReport.setFestivoHours(0.0);
             employeeReport.setTotalShifts(0);
             employeeReport.setWorkingDays(0);
+            employeeReport.setPosition(null);
+            employeeReport.setPositionName(null);
+            employeeReport.setLocations(null);
         }
         
         GlobalReportDto global = new GlobalReportDto(

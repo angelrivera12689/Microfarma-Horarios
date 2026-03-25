@@ -10,6 +10,8 @@ const DeliveryReports = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedZone, setSelectedZone] = useState('');
+  const [searchName, setSearchName] = useState('');
 
   const [filterOptions, setFilterOptions] = useState({
     locations: [],
@@ -22,7 +24,15 @@ const DeliveryReports = () => {
 
   useEffect(() => {
     loadReport();
-  }, [selectedMonth, selectedYear, selectedLocation]);
+  }, [selectedMonth, selectedYear, selectedLocation, selectedZone, searchName]);
+
+  const isDeliveryLocation = (locationName) => {
+    if (!locationName) return false;
+    const name = locationName.toLowerCase();
+    return name.includes('zona norte') || 
+           name.includes('oriente') || 
+           name.includes('sur');
+  };
 
   const loadFilters = async () => {
     setFiltersLoading(true);
@@ -31,10 +41,16 @@ const DeliveryReports = () => {
       if (response && (response.success === true || response.status === true) && response.data) {
         // Filtrar solo empleados con posición Domiciliario (búsqueda flexible)
         const deliveryEmployees = (response.data.employees || []).filter(emp => 
-          emp.position?.name && emp.position.name.toLowerCase().includes('domicili')
+          emp.position && emp.position.toLowerCase().includes('domicili')
         );
+        
+        // Filtrar solo las ubicaciones de domiciliarios (Las Américas 3 Norte, Oriente, Sur)
+        const deliveryLocations = (response.data.locations || []).filter(loc => 
+          isDeliveryLocation(loc.name)
+        );
+        
         setFilterOptions({
-          locations: response.data.locations || [],
+          locations: deliveryLocations,
           employees: deliveryEmployees
         });
       }
@@ -51,21 +67,65 @@ const DeliveryReports = () => {
       const response = selectedLocation 
         ? await reportService.getMonthlyReportByLocation(selectedMonth, selectedYear, selectedLocation)
         : await reportService.getMonthlyReport(selectedMonth, selectedYear);
-      
+       
       if (response && (response.success === true || response.status === true) && response.data) {
         // Filtrar solo empleados Domiciliarios en el reporte
-        const deliveryEmployees = (response.data.employees || []).filter(emp => 
-          emp.position?.name === 'Domiciliario'
+        let deliveryEmployees = (response.data.employees || []).filter(emp => 
+          emp.positionName && emp.positionName.toLowerCase().includes('domicili')
         );
-        const deliveryLocations = (response.data.locations || []).filter(loc => 
-          loc.shifts?.some(shift => shift.employee?.position?.name === 'Domiciliario')
-        );
+        
+        // Filtrar por nombre del domiciliario
+        if (searchName.trim()) {
+          const searchLower = searchName.toLowerCase().trim();
+          deliveryEmployees = deliveryEmployees.filter(emp => {
+            const fullName = (emp.fullName || '').toLowerCase();
+            return fullName.includes(searchLower);
+          });
+        }
+        
+        // Filtrar solo las ubicaciones de domiciliarios (Las Américas 3 Norte, Oriente, Sur)
+        let deliveryLocations = (response.data.locations || []).filter(loc => 
+          isDeliveryLocation(loc.locationName)
+        ).map(loc => ({
+          ...loc,
+          // Filtrar empleados en cada ubicación para solo mostrar domiciliarios
+          employeeReports: (loc.employeeReports || []).filter(emp => 
+            emp.positionName && emp.positionName.toLowerCase().includes('domicili')
+          )
+        })).filter(loc => loc.employeeReports && loc.employeeReports.length > 0);
+        
+        // Aplicar filtro por zona (Norte, Oriente, Sur)
+        if (selectedZone) {
+          const zoneLower = selectedZone.toLowerCase();
+          deliveryLocations = deliveryLocations.filter(loc => {
+            const locName = (loc.locationName || '').toLowerCase();
+            return locName.includes(zoneLower);
+          });
+          
+          // También filtrar empleados por zona si tienen ubicación asignada
+          if (selectedZone) {
+            deliveryEmployees = deliveryEmployees.filter(emp => {
+              const empLocations = emp.locations || [];
+              return empLocations.some(locName => {
+                return locName.toLowerCase().includes(zoneLower);
+              });
+            });
+          }
+        }
+        
+        // Recalculate global totals based on filtered domiciliarios
+        const deliveryGlobal = deliveryEmployees.length > 0 ? {
+          totalEmployees: deliveryEmployees.length,
+          totalHours: deliveryEmployees.reduce((sum, e) => sum + (e.totalHours || 0), 0),
+          nightShifts: deliveryEmployees.reduce((sum, e) => sum + (e.nightShifts || 0), 0),
+          overtimeHours: deliveryEmployees.reduce((sum, e) => sum + (e.overtimeHours || 0), 0)
+        } : null;
         
         setReport({
           ...response.data,
           employees: deliveryEmployees,
           locations: deliveryLocations,
-          global: response.data.global // Mantener totales generales
+          global: deliveryGlobal
         });
       }
     } catch (error) {
@@ -77,7 +137,7 @@ const DeliveryReports = () => {
 
   const exportToExcel = () => {
     if (report) {
-      exportReportToExcel(report, `reporte_domiciliarios_${selectedMonth}_${selectedYear}`);
+      exportReportToExcel(report, selectedMonth, selectedYear);
     }
   };
 
@@ -89,9 +149,14 @@ const DeliveryReports = () => {
 
   const columns = [
     { 
-      key: 'employee', 
-      header: 'Domiciliario', 
-      render: (value) => value ? `${value.firstName} ${value.lastName}` : '-' 
+      key: 'fullName', 
+      header: 'Nombre Completo', 
+      render: (value, row) => {
+        // Handle both object format (from backend) and string format
+        if (typeof value === 'string') return value;
+        if (row.employee) return `${row.employee.firstName} ${row.employee.lastName}`;
+        return '-';
+      }
     },
     { 
       key: 'totalHours', 
@@ -182,6 +247,31 @@ const DeliveryReports = () => {
                 ))}
               </select>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Zona</label>
+            <select
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
+            >
+              <option value="">Todas las zonas</option>
+              <option value="norte">Norte</option>
+              <option value="oriente">Oriente</option>
+              <option value="sur">Sur</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar por nombre</label>
+            <input
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="Nombre del domiciliario..."
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 w-48"
+            />
           </div>
 
           <div className="ml-auto text-right">

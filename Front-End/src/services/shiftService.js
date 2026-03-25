@@ -86,6 +86,11 @@ class ShiftService {
     const response = await apiClient.post('/api/schedules/shifts/bulk', shifts);
     return response;
   }
+
+  async checkExistingShift(employeeId, date) {
+    const response = await apiClient.get(`/api/schedules/shifts/check?employeeId=${employeeId}&date=${date}`);
+    return response;
+  }
 }
 
 const shiftService = new ShiftService();

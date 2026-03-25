@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
+import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftRepository;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesShiftService;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
 import MicrofarmaHorarios.Security.IService.ISecurityUserService;
@@ -37,6 +38,9 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
     @Autowired
     private ISecurityUserService userService;
 
+    @Autowired
+    private ISchedulesShiftRepository shiftRepository;
+
     public SchedulesShiftController(ISchedulesShiftService service) {
         super(service, "Shift");
     }
@@ -49,6 +53,34 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(new ApiResponseDto<List<Shift>>(e.getMessage(), null, false));
+        }
+    }
+
+    @GetMapping("/check")
+    public ResponseEntity<ApiResponseDto<Shift>> checkExistingShift(
+            @RequestParam String employeeId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        try {
+            var employeeOpt = employeeService.findById(employeeId);
+            if (employeeOpt.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponseDto<Shift>("Empleado no encontrado", null, false));
+            }
+            
+            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(employeeOpt.get(), date);
+            if (existingShift.isPresent()) {
+                Shift shift = existingShift.get();
+                String message = "El empleado ya tiene un turno asignado para esta fecha: " + 
+                    shift.getShiftType().getName() + " (" + 
+                    shift.getShiftType().getStartTime().toString().substring(0,5) + " - " + 
+                    shift.getShiftType().getEndTime().toString().substring(0,5) + ")";
+                return ResponseEntity.ok(new ApiResponseDto<>(message, shift, true));
+            } else {
+                return ResponseEntity.ok(new ApiResponseDto<>("No hay turno asignado para esta fecha", null, true));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponseDto<Shift>(e.getMessage(), null, false));
         }
     }
 

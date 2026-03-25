@@ -70,6 +70,19 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                 throw new Exception("Cannot assign shift to user without EMPLOYEE role");
             }
         }
+        
+        // VALIDACIÓN PARA PREVENIR DUPLICADOS: Verificar si ya existe un turno para este empleado en esta fecha
+        if (entity.getEmployee() != null && entity.getDate() != null) {
+            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(entity.getEmployee(), entity.getDate());
+            if (existingShift.isPresent()) {
+                // Si es una actualización (mismo ID), permitir; si es nuevo, rechazar
+                if (entity.getId() == null || !entity.getId().equals(existingShift.get().getId())) {
+                    String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
+                    throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
+                }
+            }
+        }
+        
         Shift savedShift = super.save(entity);
         try {
             emailService.sendShiftAssignmentEmail(savedShift);
@@ -565,7 +578,24 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
 
     @Override
     public List<Shift> saveAll(List<Shift> shifts) throws Exception {
-        return (List<Shift>) shiftRepository.saveAll(shifts);
+        // VALIDACIÓN PARA PREVENIR DUPLICADOS: Verificar cada turno antes de guardar
+        List<Shift> shiftsToSave = new java.util.ArrayList<>();
+        
+        for (Shift shift : shifts) {
+            if (shift.getEmployee() != null && shift.getDate() != null) {
+                Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(shift.getEmployee(), shift.getDate());
+                if (existingShift.isPresent()) {
+                    // Si es una actualización (mismo ID), permitir; si es nuevo, omitir
+                    if (shift.getId() == null || !shift.getId().equals(existingShift.get().getId())) {
+                        String employeeName = shift.getEmployee().getFirstName() + " " + shift.getEmployee().getLastName();
+                        throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + shift.getDate() + ". Los turnos duplicados no serán guardados.");
+                    }
+                }
+            }
+            shiftsToSave.add(shift);
+        }
+        
+        return (List<Shift>) shiftRepository.saveAll(shiftsToSave);
     }
 
 }
