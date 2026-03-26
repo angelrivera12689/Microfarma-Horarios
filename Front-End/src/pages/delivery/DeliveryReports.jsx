@@ -2,29 +2,19 @@ import { useState, useEffect } from 'react';
 import DataTable from '../../components/DataTable';
 import reportService from '../../services/reportService';
 import { exportReportToExcel } from '../../services/excelExportService';
+import useAsyncOperation from '../../hooks/useAsyncOperation';
 
 const DeliveryReports = () => {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [filtersLoading, setFiltersLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedZone, setSelectedZone] = useState('');
   const [searchName, setSearchName] = useState('');
 
-  const [filterOptions, setFilterOptions] = useState({
-    locations: [],
-    employees: []
-  });
-
-  useEffect(() => {
-    loadFilters();
-  }, []);
-
   useEffect(() => {
     loadReport();
-  }, [selectedMonth, selectedYear, selectedLocation, selectedZone, searchName]);
+  }, [selectedMonth, selectedYear, selectedZone, searchName]);
 
   const isDeliveryLocation = (locationName) => {
     if (!locationName) return false;
@@ -34,39 +24,11 @@ const DeliveryReports = () => {
            name.includes('sur');
   };
 
-  const loadFilters = async () => {
-    setFiltersLoading(true);
-    try {
-      const response = await reportService.getAvailableFilters();
-      if (response && (response.success === true || response.status === true) && response.data) {
-        // Filtrar solo empleados con posición Domiciliario (búsqueda flexible)
-        const deliveryEmployees = (response.data.employees || []).filter(emp => 
-          emp.position && emp.position.toLowerCase().includes('domicili')
-        );
-        
-        // Filtrar solo las ubicaciones de domiciliarios (Las Américas 3 Norte, Oriente, Sur)
-        const deliveryLocations = (response.data.locations || []).filter(loc => 
-          isDeliveryLocation(loc.name)
-        );
-        
-        setFilterOptions({
-          locations: deliveryLocations,
-          employees: deliveryEmployees
-        });
-      }
-    } catch (error) {
-      console.error('Error loading filters:', error);
-    } finally {
-      setFiltersLoading(false);
-    }
-  };
-
   const loadReport = async () => {
     setLoading(true);
     try {
-      const response = selectedLocation 
-        ? await reportService.getMonthlyReportByLocation(selectedMonth, selectedYear, selectedLocation)
-        : await reportService.getMonthlyReport(selectedMonth, selectedYear);
+      // Use the dedicated delivery report endpoint - filtering by zone is done in frontend
+      const response = await reportService.getMonthlyDeliveryReport(selectedMonth, selectedYear);
        
       if (response && (response.success === true || response.status === true) && response.data) {
         // Filtrar solo empleados Domiciliarios en el reporte
@@ -95,22 +57,33 @@ const DeliveryReports = () => {
         })).filter(loc => loc.employeeReports && loc.employeeReports.length > 0);
         
         // Aplicar filtro por zona (Norte, Oriente, Sur)
+        // Filter employees based on selected zone
+        const zoneMap = {
+          'norte': ['norte', 'zona norte'],
+          'oriente': ['oriente', 'zona oriente'],
+          'sur': ['sur', 'zona sur']
+        };
+        
         if (selectedZone) {
-          const zoneLower = selectedZone.toLowerCase();
+          const zoneTerms = zoneMap[selectedZone.toLowerCase()] || [selectedZone.toLowerCase()];
+          
+          // First filter locations by zone
           deliveryLocations = deliveryLocations.filter(loc => {
             const locName = (loc.locationName || '').toLowerCase();
-            return locName.includes(zoneLower);
+            return zoneTerms.some(term => locName.includes(term));
           });
           
-          // También filtrar empleados por zona si tienen ubicación asignada
-          if (selectedZone) {
-            deliveryEmployees = deliveryEmployees.filter(emp => {
-              const empLocations = emp.locations || [];
-              return empLocations.some(locName => {
-                return locName.toLowerCase().includes(zoneLower);
-              });
-            });
-          }
+          // Get the zone terms for matching against employee locations
+          const activeZoneTerms = zoneTerms.map(term => term.toLowerCase());
+          
+          // Filter employees whose locations match the selected zone
+          deliveryEmployees = deliveryEmployees.filter(emp => {
+            const empLoc = (emp.locations || []).map(l => l.toLowerCase());
+            // Check if any employee location matches the zone terms
+            return empLoc.some(loc => 
+              activeZoneTerms.some(term => loc.includes(term))
+            );
+          });
         }
         
         // Recalculate global totals based on filtered domiciliarios
@@ -140,6 +113,14 @@ const DeliveryReports = () => {
       exportReportToExcel(report, selectedMonth, selectedYear);
     }
   };
+  
+  const { execute: handleExportPdf, isLoading: isExportingPdf } = useAsyncOperation(
+    async () => {
+      if (!report) return;
+      // Use 'delivery' reportType for PDF export
+      await reportService.exportPdf(selectedMonth, selectedYear, { reportType: 'delivery' });
+    }
+  );
 
   const formatHours = (hours) => {
     const h = Math.floor(hours);
@@ -188,6 +169,13 @@ const DeliveryReports = () => {
           <p className="text-gray-600 mt-1">Reporte de horas trabajadas por domiciliarios</p>
         </div>
         <button
+          onClick={handleExportPdf}
+          disabled={!report || isExportingPdf}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed mr-2"
+        >
+          {isExportingPdf ? '📄 Generando...' : '📄 Descargar PDF'}
+        </button>
+        <button
           onClick={exportToExcel}
           disabled={!report}
           className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -225,28 +213,6 @@ const DeliveryReports = () => {
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
-            {filtersLoading ? (
-              <div className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-500">
-                Cargando ubicaciones...
-              </div>
-            ) : (
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600"
-              >
-                <option value="">Todas las ubicaciones</option>
-                {filterOptions.locations.map(location => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
 
           <div>

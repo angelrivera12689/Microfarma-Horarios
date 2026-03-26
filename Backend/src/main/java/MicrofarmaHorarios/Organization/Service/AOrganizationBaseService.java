@@ -127,6 +127,8 @@ abstract public class AOrganizationBaseService<T extends AOrganizationBaseEntity
         T entityUpdate = op.get();
         entityUpdate.setDeletedAt(LocalDateTime.now());
         entityUpdate.setDeletedBy(UUID.randomUUID().toString());
+        // Also set status to false so findByStateTrue() filters it out
+        entityUpdate.setStatus(false);
 
         getRepository().save(entityUpdate);
     }

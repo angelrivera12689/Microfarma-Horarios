@@ -143,8 +143,9 @@ public class SchedulesImportController {
                 }
                 
                 // Check if shift already exists
+                // Solo buscar turnos activos para importar
                 Optional<Shift> existingShift = shiftRepository
-                        .findByEmployeeAndDate(employee, shiftData.getDate());
+                        .findByEmployeeAndDateAndStatusTrue(employee, shiftData.getDate());
                 
                 if (existingShift.isPresent() && !overwrite) {
                     importedShifts.add(ShiftImportDetailDto.builder()

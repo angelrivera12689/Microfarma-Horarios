@@ -13,6 +13,7 @@ public interface ISchedulesReportService {
     ReportResponseDto generateReport(int month, int year) throws Exception;
     ReportResponseDto generateReportByLocation(int month, int year, String locationId) throws Exception;
     ReportResponseDto generateReportByEmployee(int month, int year, String employeeId) throws Exception;
+    ReportResponseDto generateDeliveryReport(int month, int year) throws Exception;
     ReportFiltersDto getAvailableFilters() throws Exception;
     List<LocationReportDto> generateLocationReport(int month, int year, String locationId) throws Exception;
     GlobalReportDto generateGlobalReport(int month, int year) throws Exception;

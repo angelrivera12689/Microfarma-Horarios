@@ -127,6 +127,7 @@ abstract public class AHumanResourcesBaseService<T extends AHumanResourcesBaseEn
         T entityUpdate = op.get();
         entityUpdate.setDeletedAt(LocalDateTime.now());
         entityUpdate.setDeletedBy(UUID.randomUUID().toString());
+        entityUpdate.setStatus(false); // Mark as inactive so it won't appear in findByStateTrue
 
         getRepository().save(entityUpdate);
     }

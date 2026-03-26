@@ -32,6 +32,10 @@ class ReportService {
   async getMonthlyReportByEmployee(month, year, employeeId) {
     return await apiClient.get(`/api/schedules/reports/monthly/by-employee?month=${month}&year=${year}&employeeId=${employeeId}`);
   }
+  
+  async getMonthlyDeliveryReport(month, year) {
+    return await apiClient.get(`/api/schedules/reports/monthly/delivery?month=${month}&year=${year}`);
+  }
 
   async getGlobalReport(month, year) {
     return await apiClient.get(`/api/schedules/reports/global?month=${month}&year=${year}`);

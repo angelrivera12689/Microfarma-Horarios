@@ -67,7 +67,8 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
                         .body(new ApiResponseDto<Shift>("Empleado no encontrado", null, false));
             }
             
-            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(employeeOpt.get(), date);
+            // Solo buscar turnos activos para el check
+            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDateAndStatusTrue(employeeOpt.get(), date);
             if (existingShift.isPresent()) {
                 Shift shift = existingShift.get();
                 String message = "El empleado ya tiene un turno asignado para esta fecha: " + 

@@ -11,18 +11,44 @@ const DataTable = ({
   onDelete,
   addButtonText = "Agregar",
   searchPlaceholder = "Buscar...",
-  emptyMessage = "No hay datos disponibles"
+  emptyMessage = "No hay datos disponibles",
+  searchFields = null
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Filter data based on search term
-  const filteredData = data.filter(item =>
-    Object.values(item).some(value =>
-      value && value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  );
+  // Filter data based on search term and specific fields
+  const filteredData = data.filter(item => {
+    const searchLower = searchTerm.toLowerCase();
+    
+    // If searchFields is specified, only search in those fields
+    if (searchFields && searchFields.length > 0) {
+      return searchFields.some(field => {
+        const value = item[field];
+        if (value === null || value === undefined) return false;
+        // Handle nested objects like role.name
+        if (typeof value === 'object') {
+          return Object.values(value).some(v => 
+            v && v.toString().toLowerCase().includes(searchLower)
+          );
+        }
+        return value.toString().toLowerCase().includes(searchLower);
+      });
+    }
+    
+    // Default: search in all fields
+    return Object.values(item).some(value => {
+      if (value === null || value === undefined) return false;
+      // Handle nested objects
+      if (typeof value === 'object') {
+        return Object.values(value).some(v => 
+          v && v.toString().toLowerCase().includes(searchLower)
+        );
+      }
+      return value.toString().toLowerCase().includes(searchLower);
+    });
+  });
 
   // Pagination
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);

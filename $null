@@ -1,0 +1,8 @@
+Invoke-WebRequest : Error en el servidor remoto: (401) No autorizado.
+En l¡nea: 1 Car cter: 1
++ Invoke-WebRequest -Uri 'http://localhost:8083/api/v1/company' -Method ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], WebExc 
+   eption
+    + FullyQualifiedErrorId : WebCmdletWebResponseException,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+ 

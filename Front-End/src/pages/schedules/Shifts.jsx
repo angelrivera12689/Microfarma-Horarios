@@ -17,10 +17,22 @@ const Shifts = () => {
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'calendar'
-  const [selectedLocation, setSelectedLocation] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const calendarRef = useRef();
+  
+  // Filtros para turnos - solo para vista tabla
+  const [filterDate, setFilterDate] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  const [filterShiftType, setFilterShiftType] = useState('');
+  const [filterEmployee, setFilterEmployee] = useState('');
+  const [filterLocation, setFilterLocation] = useState('');
+
+  // Filtros independientes para vista calendario
+  const [calendarFilterLocation, setCalendarFilterLocation] = useState('');
+  const [calendarFilterEmployee, setCalendarFilterEmployee] = useState('');
+  const [calendarFilterShiftType, setCalendarFilterShiftType] = useState('');
   
   // Estado para mostrar advertencia de turno existente
   const [existingShiftWarning, setExistingShiftWarning] = useState(null);
@@ -155,17 +167,20 @@ const Shifts = () => {
     setCheckingShift(true);
     try {
       const response = await shiftService.checkExistingShift(employeeId, date);
-      if (response.status && response.data) {
+      // Solo mostrar advertencia si la respuesta tiene status=true Y tiene datos
+      if (response && response.status === true && response.data) {
         // Hay un turno existente - mostrar advertencia
         setExistingShiftWarning({
           message: response.message,
           existingShift: response.data
         });
       } else {
+        // No hay turno existente o hubo un error - limpiar advertencia
         setExistingShiftWarning(null);
       }
     } catch (error) {
       console.error('Error checking existing shift:', error);
+      // En caso de error, permitir crear (no bloquear al usuario)
       setExistingShiftWarning(null);
     } finally {
       setCheckingShift(false);
@@ -175,13 +190,23 @@ const Shifts = () => {
   // Handler para cambio de empleado en el formulario
   const handleEmployeeChange = (employeeId) => {
     setFormData({...formData, employeeId});
-    checkExistingShift(employeeId, formData.date);
+    // Only check if both employee and date are filled
+    if (employeeId && formData.date) {
+      checkExistingShift(employeeId, formData.date);
+    } else {
+      setExistingShiftWarning(null);
+    }
   };
 
   // Handler para cambio de fecha en el formulario
   const handleDateChange = (date) => {
     setFormData({...formData, date});
-    checkExistingShift(formData.employeeId, date);
+    // Only check if both employee and date are filled
+    if (formData.employeeId && date) {
+      checkExistingShift(formData.employeeId, date);
+    } else {
+      setExistingShiftWarning(null);
+    }
   };
 
   const handleAdd = () => {
@@ -197,6 +222,8 @@ const Shifts = () => {
     setFormError(null);
     setSubmitting(false);
     setModalOpen(true);
+    // También verificar si hay turnos existentes para el empleado y fecha seleccionados
+    // al abrir el formulario de nuevo
   };
 
   const handleBulkAdd = () => {
@@ -242,13 +269,29 @@ const Shifts = () => {
         current.setDate(current.getDate() + 1);
       }
 
-      await shiftService.createBulkShifts(shiftsToCreate);
+      const response = await shiftService.createBulkShifts(shiftsToCreate);
+      console.log('API Response:', response);
+
+      // Verificar si la respuesta indica error
+      if (response && response.status === false) {
+        alert('Error al crear turnos: ' + (response.message || 'Error desconocido'));
+        return;
+      }
+
       setBulkModalOpen(false);
       await loadShifts();
       alert(`Se crearon ${shiftsToCreate.length} turnos correctamente`);
     } catch (error) {
       console.error('Error creating bulk shifts:', error);
-      alert('Error al crear los turnos en bulk');
+      let errorMessage = 'Error al crear los turnos en bulk';
+      if (error.response) {
+        errorMessage += ': ' + (error.response.data?.message || error.response.statusText || error.message);
+      } else if (error.request) {
+        errorMessage += ': No se recibió respuesta del servidor';
+      } else {
+        errorMessage += ': ' + error.message;
+      }
+      alert(errorMessage);
     }
   };
 
@@ -333,12 +376,78 @@ const Shifts = () => {
     { key: 'notes', header: 'Notas' }
   ];
 
-  const filteredShifts = selectedLocation
-    ? shifts.filter(shift => shift.location?.id == selectedLocation)
-    : shifts;
+  const getFilteredShifts = () => {
+    return shifts.filter(shift => {
+      // Filtro por ubicación - usar filtro local además del global
+      if (filterLocation) {
+        const locationName = shift.location?.name || '';
+        if (!locationName.toLowerCase().includes(filterLocation.toLowerCase())) {
+          return false;
+        }
+      }
+      // Filtro por fecha específica
+      if (filterDate) {
+        const shiftDate = shift.date ? shift.date.split('T')[0] : '';
+        if (shiftDate !== filterDate) return false;
+      }
+      // Filtro por mes
+      if (filterMonth) {
+        const shiftMonth = shift.date ? shift.date.substring(5, 7) : '';
+        if (shiftMonth !== filterMonth) return false;
+      }
+      // Filtro por año
+      if (filterYear) {
+        const shiftYear = shift.date ? shift.date.substring(0, 4) : '';
+        if (shiftYear !== filterYear) return false;
+      }
+      // Filtro por tipo de turno - comparar por nombre (case insensitive y búsqueda parcial)
+      if (filterShiftType) {
+        const shiftTypeName = shift.shiftType?.name || '';
+        if (!shiftTypeName.toLowerCase().includes(filterShiftType.toLowerCase())) {
+          return false;
+        }
+      }
+      // Filtro por empleado - comparar por nombre (case insensitive y búsqueda parcial)
+      if (filterEmployee) {
+        const empName = `${shift.employee?.firstName || ''} ${shift.employee?.lastName || ''}`.toLowerCase();
+        if (!empName.toLowerCase().includes(filterEmployee.toLowerCase())) return false;
+      }
+      return true;
+    });
+  };
+
+  // Los filtros solo aplican a la vista tabla, no al calendario
+  const tableShifts = getFilteredShifts();
+  
+  // Función para filtrar turnos del calendario
+  const getFilteredCalendarShifts = () => {
+    return shifts.filter(shift => {
+      // Filtro por ubicación
+      if (calendarFilterLocation) {
+        const locationName = shift.location?.name || '';
+        if (!locationName.toLowerCase().includes(calendarFilterLocation.toLowerCase())) {
+          return false;
+        }
+      }
+      // Filtro por tipo de turno
+      if (calendarFilterShiftType) {
+        const shiftTypeName = shift.shiftType?.name || '';
+        if (!shiftTypeName.toLowerCase().includes(calendarFilterShiftType.toLowerCase())) {
+          return false;
+        }
+      }
+      // Filtro por empleado
+      if (calendarFilterEmployee) {
+        const empName = `${shift.employee?.firstName || ''} ${shift.employee?.lastName || ''}`.toLowerCase();
+        if (!empName.toLowerCase().includes(calendarFilterEmployee.toLowerCase())) return false;
+      }
+      return true;
+    });
+  };
+  const calendarShifts = getFilteredCalendarShifts();
 
   const exportToExcel = () => {
-    const dataToExport = viewMode === 'calendar' ? filteredShifts : shifts;
+    const dataToExport = viewMode === 'calendar' ? shifts : tableShifts;
     exportShiftsToExcel(dataToExport, 'turnos');
   };
 
@@ -358,7 +467,7 @@ const Shifts = () => {
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayShifts = filteredShifts
+      const dayShifts = calendarShifts
         .filter(shift => shift.date?.startsWith(dateStr))
         .sort((a, b) => {
           const timeA = a.shiftType?.startTime || '00:00';
@@ -443,11 +552,12 @@ const Shifts = () => {
             {viewMode === 'calendar' && (
               <button
                 onClick={() => {
-                  if (!selectedLocation) {
+                  if (!calendarFilterLocation) {
                     alert('Por favor selecciona una ubicación para descargar el calendario.');
                     return;
                   }
-                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, selectedLocation);
+                  const locationId = locations.find(l => l.name === calendarFilterLocation)?.id;
+                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, locationId);
                 }}
                 className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
               >
@@ -457,21 +567,62 @@ const Shifts = () => {
           </div>
 
           {viewMode === 'calendar' && (
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              {/* Filtro por Ubicación para Calendario */}
               <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
+                value={calendarFilterLocation}
+                onChange={(e) => setCalendarFilterLocation(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
               >
                 <option value="">Todas las ubicaciones</option>
                 {locations.map(location => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.company?.name})
+                  <option key={location.id} value={location.name}>
+                    {location.name}
                   </option>
                 ))}
               </select>
 
-              <div className="flex items-center space-x-2">
+              {/* Filtro por Tipo de Turno para Calendario */}
+              <select
+                value={calendarFilterShiftType}
+                onChange={(e) => setCalendarFilterShiftType(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              >
+                <option value="">Todos los tipos</option>
+                {shiftTypes.map(st => (
+                  <option key={st.id} value={st.name}>{st.name}</option>
+                ))}
+              </select>
+
+              {/* Filtro por Empleado para Calendario */}
+              <select
+                value={calendarFilterEmployee}
+                onChange={(e) => setCalendarFilterEmployee(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+              >
+                <option value="">Todos los empleados</option>
+                {employees.map(emp => (
+                  <option key={emp.id} value={`${emp.firstName} ${emp.lastName}`}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
+
+              {/* Botón limpiar filtros calendario */}
+              {(calendarFilterLocation || calendarFilterShiftType || calendarFilterEmployee) && (
+                <button
+                  onClick={() => {
+                    setCalendarFilterLocation('');
+                    setCalendarFilterShiftType('');
+                    setCalendarFilterEmployee('');
+                  }}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 font-medium"
+                >
+                  Limpiar
+                </button>
+              )}
+
+              <div className="flex items-center space-x-2 ml-auto">
                 <button
                   onClick={() => {
                     if (currentMonth === 0) {
@@ -507,19 +658,142 @@ const Shifts = () => {
         </div>
 
         {viewMode === 'table' ? (
-          <DataTable
-            title=""
-            icon=""
-            columns={columns}
-            data={shifts}
-            loading={loading}
-            onAdd={handleAdd}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            addButtonText="Agregar Turno"
-            searchPlaceholder="Buscar turnos..."
-            emptyMessage="No hay turnos registrados en el sistema"
-          />
+          <>
+            {/* Filtros de Turnos */}
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Filtros de Turnos</h3>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                {/* Filtro por Fecha específica */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  />
+                </div>
+
+                {/* Filtro por Mes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mes</label>
+                  <select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Todos los meses</option>
+                    <option value="01">Enero</option>
+                    <option value="02">Febrero</option>
+                    <option value="03">Marzo</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Mayo</option>
+                    <option value="06">Junio</option>
+                    <option value="07">Julio</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                  </select>
+                </div>
+
+                {/* Filtro por Año */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Año</label>
+                  <select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Todos los años</option>
+                    <option value="2026">2026</option>
+                    <option value="2025">2025</option>
+                    <option value="2024">2024</option>
+                    <option value="2023">2023</option>
+                  </select>
+                </div>
+
+                {/* Filtro por Tipo de Turno */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Turno</label>
+                  <select
+                    value={filterShiftType}
+                    onChange={(e) => setFilterShiftType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Todos los tipos</option>
+                    {shiftTypes.map(st => (
+                      <option key={st.id} value={st.name}>{st.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtro por Ubicación */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ubicación</label>
+                  <select
+                    value={filterLocation}
+                    onChange={(e) => setFilterLocation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Todas las ubicaciones</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.name}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Filtro por Empleado */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Empleado</label>
+                  <select
+                    value={filterEmployee}
+                    onChange={(e) => setFilterEmployee(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  >
+                    <option value="">Todos los empleados</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={`${emp.firstName} ${emp.lastName}`}>{emp.firstName} {emp.lastName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Botón limpiar filtros */}
+              {(filterDate || filterMonth || filterYear || filterShiftType || filterEmployee || filterLocation) && (
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      setFilterDate('');
+                      setFilterMonth('');
+                      setFilterYear('');
+                      setFilterShiftType('');
+                      setFilterEmployee('');
+                      setFilterLocation('');
+                    }}
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 font-medium"
+                  >
+                    Limpiar Filtros
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <DataTable
+              title=""
+              icon=""
+              columns={columns}
+              data={tableShifts}
+              loading={loading}
+              onAdd={handleAdd}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              addButtonText="Agregar Turno"
+              searchPlaceholder="Buscar turnos..."
+              emptyMessage="No hay turnos registrados en el sistema"
+            />
+          </>
         ) : (
           <div className="bg-white">
             <div ref={calendarRef} className="grid grid-cols-7 gap-2 border border-gray-300 rounded-lg overflow-hidden shadow-lg">

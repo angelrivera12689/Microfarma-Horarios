@@ -81,10 +81,15 @@ const Users = () => {
   const handleDelete = async (user) => {
     if (window.confirm(`¿Estás seguro de que quieres eliminar al usuario "${user.name}"?`)) {
       try {
-        await userService.deleteUser(user.id);
-        await loadUsers();
-      } catch {
-        alert('Error al eliminar el usuario');
+        const response = await userService.deleteUser(user.id);
+        if (response && response.status) {
+          await loadUsers();
+        } else {
+          alert('Error al eliminar el usuario: ' + (response?.message || 'Error desconocido'));
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error al eliminar el usuario: ' + (error.message || 'Error de conexión'));
       }
     }
   };
@@ -153,8 +158,9 @@ const Users = () => {
         onEdit={handleEdit}
         onDelete={handleDelete}
         addButtonText="Agregar Usuario"
-        searchPlaceholder="Buscar usuarios..."
+        searchPlaceholder="Buscar por nombre, correo o rol..."
         emptyMessage="No hay usuarios registrados en el sistema"
+        searchFields={['name', 'email', 'role']}
       />
 
       <Modal

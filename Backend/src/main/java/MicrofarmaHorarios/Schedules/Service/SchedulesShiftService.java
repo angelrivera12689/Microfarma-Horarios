@@ -22,9 +22,11 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 
 import MicrofarmaHorarios.Schedules.Entity.Shift;
+import MicrofarmaHorarios.Schedules.Entity.ShiftType;
 import MicrofarmaHorarios.Schedules.IRepository.ISchedulesBaseRepository;
 import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftRepository;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesShiftService;
+import MicrofarmaHorarios.Schedules.IService.ISchedulesShiftTypeService;
 import MicrofarmaHorarios.Notification.Service.EmailService;
 import MicrofarmaHorarios.Security.IService.ISecurityUserService;
 import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
@@ -50,6 +52,9 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
     @Autowired
     private IOrganizationLocationService locationService;
 
+    @Autowired
+    private ISchedulesShiftTypeService shiftTypeService;
+
     @Override
     protected ISchedulesBaseRepository<Shift, String> getRepository() {
         return shiftRepository;
@@ -73,12 +78,38 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
         
         // VALIDACIÓN PARA PREVENIR DUPLICADOS: Verificar si ya existe un turno para este empleado en esta fecha
         if (entity.getEmployee() != null && entity.getDate() != null) {
-            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(entity.getEmployee(), entity.getDate());
-            if (existingShift.isPresent()) {
-                // Si es una actualización (mismo ID), permitir; si es nuevo, rechazar
-                if (entity.getId() == null || !entity.getId().equals(existingShift.get().getId())) {
-                    String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
-                    throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
+            // Buscar cualquier turno existente (sin importar status ni deleted_at)
+            List<Shift> existingShifts = shiftRepository.findByEmployeeId(entity.getEmployee().getId());
+            List<Shift> shiftsForDate = existingShifts.stream()
+                .filter(s -> s.getDate() != null && s.getDate().equals(entity.getDate()))
+                .toList();
+            
+            if (!shiftsForDate.isEmpty()) {
+                // Verificar si hay un turno activo (no eliminado)
+                // O si el turno existente es el mismo que se está actualizando
+                for (Shift existing : shiftsForDate) {
+                    boolean isSameId = entity.getId() != null && entity.getId().equals(existing.getId());
+                    boolean isNotDeleted = existing.getDeletedAt() == null;
+                    
+                    // Si no es el mismo ID Y no está eliminado,不允许
+                    if (!isSameId && isNotDeleted) {
+                        String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
+                        throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
+                    }
+                    
+                    // Si es el mismo ID O está eliminado, permitir (reactivar)
+                    if (isSameId || !isNotDeleted) {
+                        // Reactivar turno eliminado o actualizar turno existente
+                        existing.setDeletedAt(null);
+                        existing.setStatus(true);
+                        existing.setEmployee(entity.getEmployee());
+                        existing.setLocation(entity.getLocation());
+                        existing.setShiftType(entity.getShiftType());
+                        existing.setDate(entity.getDate());
+                        existing.setNotes(entity.getNotes());
+                        existing.setUpdatedBy(entity.getCreatedBy());
+                        return super.save(existing);
+                    }
                 }
             }
         }
@@ -582,8 +613,39 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
         List<Shift> shiftsToSave = new java.util.ArrayList<>();
         
         for (Shift shift : shifts) {
+            // Cargar las entidades completas desde la BD usando los IDs proporcionados
+            if (shift.getEmployee() != null && shift.getEmployee().getId() != null) {
+                var employeeOpt = employeeService.findById(shift.getEmployee().getId());
+                if (employeeOpt.isPresent()) {
+                    shift.setEmployee(employeeOpt.get());
+                } else {
+                    throw new Exception("Empleado no encontrado con ID: " + shift.getEmployee().getId());
+                }
+            }
+            
+            if (shift.getLocation() != null && shift.getLocation().getId() != null) {
+                var locationOpt = locationService.findById(shift.getLocation().getId());
+                if (locationOpt.isPresent()) {
+                    shift.setLocation(locationOpt.get());
+                } else {
+                    throw new Exception("Ubicación no encontrada con ID: " + shift.getLocation().getId());
+                }
+            }
+            
+            if (shift.getShiftType() != null && shift.getShiftType().getId() != null) {
+                // Cargar el shiftType completo
+                var shiftTypeOpt = shiftTypeService.findById(shift.getShiftType().getId());
+                if (shiftTypeOpt.isPresent()) {
+                    shift.setShiftType(shiftTypeOpt.get());
+                } else {
+                    throw new Exception("Tipo de turno no encontrado con ID: " + shift.getShiftType().getId());
+                }
+            }
+            
             if (shift.getEmployee() != null && shift.getDate() != null) {
-                Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDate(shift.getEmployee(), shift.getDate());
+                // Solo buscar turnos ACTIVOS (status = true) para permitir crear nuevos turnos
+                // aunque existan turnos eliminados (soft deleted)
+                Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDateAndStatusTrue(shift.getEmployee(), shift.getDate());
                 if (existingShift.isPresent()) {
                     // Si es una actualización (mismo ID), permitir; si es nuevo, omitir
                     if (shift.getId() == null || !shift.getId().equals(existingShift.get().getId())) {

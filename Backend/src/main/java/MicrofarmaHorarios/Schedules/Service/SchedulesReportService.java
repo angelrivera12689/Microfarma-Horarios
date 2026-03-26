@@ -20,6 +20,8 @@ import MicrofarmaHorarios.Schedules.DTO.Response.OvertimeDetailDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportFiltersDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
+import MicrofarmaHorarios.Schedules.Entity.ShiftTimeRange;
+import MicrofarmaHorarios.Schedules.Entity.ShiftType;
 import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftRepository;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesReportService;
 
@@ -269,7 +271,7 @@ public class SchedulesReportService implements ISchedulesReportService {
                 overtimeDetails.add(new OvertimeDetailDto(shift.getDate(), extraForThisShift, shift.getNotes(), shift.getLocation().getName()));
 
                 // Categorizar horas extras por tiempo
-                double diurnaExtra = calculateDiurnaExtraHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime(), regularHoursPerDay);
+                double diurnaExtra = calculateDiurnaExtraHours(shift.getShiftType(), extraForThisShift);
                 double nocturnaExtra = extraForThisShift - diurnaExtra;
 
                 diurnaExtraHours += diurnaExtra;
@@ -341,34 +343,58 @@ public class SchedulesReportService implements ISchedulesReportService {
 
     /**
      * Calcula las horas extras diurnas (6:00 AM - 7:00 PM) en un turno
+     * Soporta turnos multi-rango (PARTIDO)
      */
-    private double calculateDiurnaExtraHours(LocalTime start, LocalTime end, double regularHours) {
-        if (start == null || end == null || regularHours <= 0) {
+    private double calculateDiurnaExtraHours(ShiftType shiftType, double extraHours) {
+        if (shiftType == null || extraHours <= 0) {
             return 0.0;
         }
 
         LocalTime diurnaStart = LocalTime.of(6, 0);
         LocalTime diurnaEnd = LocalTime.of(19, 0); // 7:00 PM
 
-        // Calcular horas totales del turno
-        double totalHours = calculateHours(start, end);
-        double extraHours = Math.max(0, totalHours - regularHours);
+        // Si es un turno multi-rango (PARTIDO), usar los timeRanges
+        if (shiftType.getIsMultiRange() != null && shiftType.getIsMultiRange() && 
+            shiftType.getTimeRanges() != null && !shiftType.getTimeRanges().isEmpty()) {
+            
+            double diurnaExtra = 0;
+            for (ShiftTimeRange range : shiftType.getTimeRanges()) {
+                LocalTime rangeStart = range.getStartTime();
+                LocalTime rangeEnd = range.getEndTime();
+                
+                // Calcular portion de este rango que es extra
+                double rangeTotalHours = range.getDurationHours();
+                double rangeExtra = Math.max(0, rangeTotalHours - 8.0); // 8 horas regulares por turno
+                
+                // Calcular portion diurna de las extras
+                if (rangeEnd.isAfter(diurnaStart) && rangeStart.isBefore(diurnaEnd)) {
+                    // La porción diurna es el mínimo entre las horas extra del rango y el tiempo en horario diurno
+                    LocalTime effectiveStart = rangeStart.isBefore(diurnaStart) ? diurnaStart : rangeStart;
+                    LocalTime effectiveEnd = rangeEnd.isAfter(diurnaEnd) ? diurnaEnd : rangeEnd;
+                    if (effectiveEnd.isAfter(effectiveStart)) {
+                        diurnaExtra += Math.min(rangeExtra, calculateHours(effectiveStart, effectiveEnd));
+                    }
+                }
+            }
+            return diurnaExtra;
+        }
 
-        if (extraHours == 0) {
+        // Fallback para turnos simples
+        LocalTime start = shiftType.getStartTime();
+        LocalTime end = shiftType.getEndTime();
+        
+        if (start == null || end == null) {
             return 0.0;
         }
 
-        // Para simplificar, asumimos que las horas extras siguen el patrón del turno
         // Si el turno termina después de 7 PM, las extras son nocturnas
-        // Si termina antes o igual a 7 PM, son diurnas
-        if (end.isAfter(diurnaEnd) || (end.equals(diurnaEnd) && totalHours > regularHours)) {
-            // Verificar si las horas extras ocurren en horario nocturno
-            LocalTime extraStart = start.plusHours((long) regularHours);
+        if (end.isAfter(diurnaEnd) || (end.equals(diurnaEnd) && extraHours > 0)) {
+            LocalTime extraStart = start.plusHours(8);
             if (extraStart.isBefore(diurnaEnd)) {
-                // Parte diurna de las extras
                 double diurnaPortion = Math.min(extraHours, calculateHours(extraStart, diurnaEnd));
                 return diurnaPortion;
             }
+            return 0.0; // Todas las extras son nocturnas
         }
 
         // Si todo el turno está en horario diurno, todas las extras son diurnas
@@ -486,5 +512,119 @@ public class SchedulesReportService implements ISchedulesReportService {
         );
         
         return new ReportResponseDto(global, new ArrayList<>(), Arrays.asList(employeeReport));
+    }
+    
+    @Override
+    @Transactional(readOnly = true)
+    public ReportResponseDto generateDeliveryReport(int month, int year) throws Exception {
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDate startDate = yearMonth.atDay(1);
+        LocalDate endDate = yearMonth.atEndOfMonth();
+
+        // Helper to check if location is for delivery
+        java.util.function.Function<String, Boolean> isDeliveryLocation = (locationName) -> {
+            if (locationName == null) return false;
+            String name = locationName.toLowerCase();
+            return name.contains("zona norte") || name.contains("oriente") || name.contains("sur");
+        };
+        
+        // Helper to check if employee is domiciliario
+        java.util.function.Function<MicrofarmaHorarios.HumanResources.Entity.Employee, Boolean> isDomiciliario = (employee) -> {
+            if (employee == null || employee.getPosition() == null || employee.getPosition().getName() == null) {
+                return false;
+            }
+            return employee.getPosition().getName().toLowerCase().contains("domicili");
+        };
+
+        List<Shift> shifts = shiftRepository.findByDateBetween(startDate, endDate).stream()
+                .filter(shift -> shift.getStatus() != null && shift.getStatus() && shift.getEmployee() != null && shift.getShiftType() != null)
+                // Filter by delivery locations
+                .filter(shift -> shift.getLocation() != null && isDeliveryLocation.apply(shift.getLocation().getName()))
+                // Filter by domiciliario employees
+                .filter(shift -> isDomiciliario.apply(shift.getEmployee()))
+                .collect(Collectors.toList());
+
+        Map<String, List<Shift>> shiftsByLocation = shifts.stream()
+                .filter(shift -> shift.getLocation().getId() != null)
+                .collect(Collectors.groupingBy(shift -> shift.getLocation().getId()));
+
+        List<LocationReportDto> locationReports = new ArrayList<>();
+        double globalTotalHours = 0;
+        double globalTotalOvertime = 0;
+        int globalTotalShifts = 0;
+        int globalTotalEmployees = 0;
+
+        for (Map.Entry<String, List<Shift>> entry : shiftsByLocation.entrySet()) {
+            List<Shift> locationShifts = entry.getValue();
+            String locationName = locationShifts.get(0).getLocation().getName();
+
+            Map<String, List<Shift>> shiftsByEmployee = locationShifts.stream()
+                    .filter(shift -> shift.getEmployee().getId() != null)
+                    .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId()));
+
+            List<EmployeeReportDto> employeeReports = new ArrayList<>();
+            double locationTotalHours = 0;
+            double locationTotalOvertime = 0;
+            int locationTotalShifts = 0;
+
+            for (Map.Entry<String, List<Shift>> empEntry : shiftsByEmployee.entrySet()) {
+                List<Shift> employeeShifts = empEntry.getValue();
+                EmployeeReportDto report = calculateEmployeeReport(employeeShifts);
+
+                if (report != null) {
+                    employeeReports.add(report);
+                    locationTotalHours += report.getTotalHours();
+                    locationTotalOvertime += report.getOvertimeHours();
+                    locationTotalShifts += report.getTotalShifts() != null ? report.getTotalShifts() : 0;
+                }
+            }
+
+            LocationReportDto locationReport = new LocationReportDto(
+                    locationName,
+                    shiftsByEmployee.size(),
+                    locationTotalHours,
+                    locationTotalOvertime,
+                    0.0,  // regularHours
+                    0.0,  // diurnaExtra
+                    0.0,  // nocturnaExtra
+                    0.0,  // dominical
+                    0.0,  // festivo
+                    locationTotalShifts,
+                    employeeReports
+            );
+            locationReports.add(locationReport);
+
+            globalTotalEmployees += shiftsByEmployee.size();
+            globalTotalHours += locationTotalHours;
+            globalTotalOvertime += locationTotalOvertime;
+            globalTotalShifts += locationTotalShifts;
+        }
+
+        GlobalReportDto global = new GlobalReportDto(
+                globalTotalEmployees,
+                globalTotalHours,
+                globalTotalOvertime,
+                0.0,  // regularHours
+                0.0,  // diurnaExtra
+                0.0,  // nocturnaExtra
+                0.0,  // dominical
+                0.0,  // festivo
+                globalTotalShifts
+        );
+        
+        // Get all employees from filtered shifts
+        List<EmployeeReportDto> allEmployees = shifts.stream()
+                .map(shift -> shift.getEmployee().getId())
+                .distinct()
+                .map(empId -> {
+                    List<Shift> empShifts = shifts.stream()
+                            .filter(s -> s.getEmployee().getId().equals(empId))
+                            .collect(Collectors.toList());
+                    return calculateEmployeeReport(empShifts);
+                })
+                .filter(report -> report != null)
+                .collect(Collectors.toList());
+
+        return new ReportResponseDto(global, locationReports, allEmployees);
     }
 }

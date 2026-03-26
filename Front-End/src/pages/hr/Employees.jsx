@@ -23,6 +23,15 @@ const Employees = () => {
     positionId: '',
     contractTypeId: ''
   });
+  
+  // Filtros
+  const [filterPosition, setFilterPosition] = useState('');
+  const [filterContractType, setFilterContractType] = useState('');
+  const [filterYear, setFilterYear] = useState('');
+  
+  // Generar años para el filtro (desde 2020 hasta el año actual)
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: currentYear - 2019 }, (_, i) => currentYear - i);
 
   useEffect(() => {
     loadEmployees();
@@ -157,9 +166,46 @@ const Employees = () => {
     {
       key: 'hireDate',
       header: 'Fecha de Contratación',
-      render: (value) => value ? new Date(value).toLocaleDateString() : ''
+      render: (value) => value ? formatDate(value) : ''
     }
   ];
+
+  // Función para formatear fecha nicely
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    // Fix timezone issue: append time to treat as local instead of UTC
+    // Use noon to avoid daylight saving time edge cases
+    const dateStr = dateString.includes('T') ? dateString : dateString + 'T12:00:00';
+    const date = new Date(dateStr);
+    // Just format directly - no offset adjustment needed
+    return date.toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  // Obtener empleados filtrados
+  const getFilteredEmployees = () => {
+    return employees.filter(emp => {
+      // Filtro por posición - comparar por nombre
+      if (filterPosition && emp.position?.name !== filterPosition) {
+        return false;
+      }
+      // Filtro por tipo de contrato - comparar por nombre
+      if (filterContractType && emp.contractType?.name !== filterContractType) {
+        return false;
+      }
+      // Filtro por año de contratación
+      if (filterYear) {
+        const hireYear = emp.hireDate ? new Date(emp.hireDate).getFullYear() : null;
+        if (String(hireYear) !== filterYear) {
+          return false;
+        }
+      }
+      return true;
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -170,19 +216,89 @@ const Employees = () => {
         </div>
       </div>
 
-      <DataTable
-        title="Empleados"
-        icon="👥"
-        columns={columns}
-        data={employees}
-        loading={loading}
-        onAdd={handleAdd}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        addButtonText="Agregar Empleado"
-        searchPlaceholder="Buscar empleados..."
-        emptyMessage="No hay empleados registrados en el sistema"
-      />
+      <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <span className="text-green-600 text-xl">👥</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Empleados</h2>
+              <p className="text-sm text-gray-500">
+                {loading ? 'Cargando...' : `${getFilteredEmployees().length} empleados`}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Filtros Organizados */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          {/* Filtro por Posición */}
+          <select
+            value={filterPosition}
+            onChange={(e) => setFilterPosition(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+          >
+            <option value="">Todas las posiciones</option>
+            {positions.map(pos => (
+              <option key={pos.id} value={pos.name}>{pos.name}</option>
+            ))}
+          </select>
+
+          {/* Filtro por Tipo de Contrato */}
+          <select
+            value={filterContractType}
+            onChange={(e) => setFilterContractType(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+          >
+            <option value="">Todos los contratos</option>
+            {contractTypes.map(ct => (
+              <option key={ct.id} value={ct.name}>{ct.name}</option>
+            ))}
+          </select>
+
+          {/* Filtro por Fecha de Contratación (Año) */}
+          <select
+            value={filterYear}
+            onChange={(e) => setFilterYear(e.target.value)}
+            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
+          >
+            <option value="">Todos los años</option>
+            {years.map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+
+          {/* Botón para limpiar filtros */}
+          {(filterPosition || filterContractType || filterYear) && (
+            <button
+              onClick={() => {
+                setFilterPosition('');
+                setFilterContractType('');
+                setFilterYear('');
+              }}
+              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 font-medium"
+            >
+              Limpiar Filtros
+            </button>
+          )}
+        </div>
+
+        <DataTable
+          title="Empleados"
+          icon="👥"
+          columns={columns}
+          data={getFilteredEmployees()}
+          loading={loading}
+          onAdd={handleAdd}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          addButtonText="Agregar Empleado"
+          searchPlaceholder="Buscar empleados..."
+          emptyMessage="No hay empleados registrados en el sistema"
+          searchFields={null}
+        />
+      </div>
 
       <Modal
         isOpen={modalOpen}

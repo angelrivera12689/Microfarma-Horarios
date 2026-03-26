@@ -9,6 +9,7 @@ import { exportShiftsToExcel } from '../../services/excelExportService';
 
 const DeliveryShifts = () => {
   const [shifts, setShifts] = useState([]);
+  const [allShifts, setAllShifts] = useState([]); // Keep all shifts for filtering
   const [employees, setEmployees] = useState([]);
   const [locations, setLocations] = useState([]);
   const [shiftTypes, setShiftTypes] = useState([]);
@@ -19,6 +20,7 @@ const DeliveryShifts = () => {
   const [viewMode, setViewMode] = useState('table');
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [filterLocation, setFilterLocation] = useState(''); // Location filter
   const calendarRef = useRef();
   
   // Estado para mostrar advertencia de turno existente
@@ -66,16 +68,44 @@ const DeliveryShifts = () => {
     loadShiftTypes();
   }, []);
 
+  // Apply location filter whenever filterLocation or allShifts changes
+  useEffect(() => {
+    // Don't filter if locations haven't loaded yet
+    if (locations.length === 0) {
+      return;
+    }
+    
+    if (!filterLocation) {
+      // Show all shifts when no filter selected
+      setShifts(allShifts);
+    } else {
+      // Find the selected location from the locations array
+      const selectedLoc = locations.find(l => l.id === filterLocation);
+      if (selectedLoc) {
+        // Simple matching: filter shifts where location name contains the selected zone name
+        // Extract the zone name (e.g., "Sur" from "Zona Sur", "Norte" from "Zona Norte")
+        const zoneName = selectedLoc.name.replace(/zona\s+/i, '').trim(); // Remove "Zona " prefix
+        
+        const filtered = allShifts.filter(shift => {
+          const locName = shift.location?.name?.toLowerCase() || '';
+          return locName.includes(zoneName.toLowerCase());
+        });
+        setShifts(filtered);
+      }
+    }
+  }, [filterLocation, allShifts, locations]);
+
   const loadShifts = async () => {
     try {
       const response = await shiftService.getAllShifts();
       if (response.data) {
-        const allShifts = Array.isArray(response.data) ? response.data : [];
+        const allShiftsData = Array.isArray(response.data) ? response.data : [];
         // Filtrar solo turnos de domiciliarios (empleados con posición Domiciliario)
-        const deliveryShifts = allShifts.filter(shift => 
+        const deliveryShiftsData = allShiftsData.filter(shift => 
           shift.employee?.position?.name && shift.employee.position.name.toLowerCase().includes('domicili')
         );
-        setShifts(deliveryShifts);
+        setAllShifts(deliveryShiftsData); // Store all for filtering
+        setShifts(deliveryShiftsData); // Apply initial filter (all)
       } else {
         console.error('Failed to load shifts:', response.message);
         alert('Error al cargar turnos: ' + (response.message || 'Error desconocido'));
@@ -248,13 +278,34 @@ const DeliveryShifts = () => {
         current.setDate(current.getDate() + 1);
       }
 
-      await shiftService.createBulkShifts(shiftsToCreate);
+      console.log('Creating bulk shifts:', shiftsToCreate.length, 'shifts');
+      console.log('Sample data:', JSON.stringify(shiftsToCreate[0]));
+
+      const response = await shiftService.createBulkShifts(shiftsToCreate);
+      console.log('API Response:', response);
+
+      // Verificar si la respuesta indica error
+      if (response && response.status === false) {
+        alert('Error al crear turnos: ' + (response.message || 'Error desconocido'));
+        return;
+      }
+
+      console.log('Bulk shifts created successfully');
       setBulkModalOpen(false);
       await loadShifts();
       alert(`Se crearon ${shiftsToCreate.length} turnos correctamente`);
     } catch (error) {
       console.error('Error creating bulk shifts:', error);
-      alert('Error al crear los turnos en bulk');
+      // Mostrar mensaje de error más detallado
+      let errorMessage = 'Error al crear los turnos en bulk';
+      if (error.response) {
+        errorMessage += ': ' + (error.response.data?.message || error.response.statusText || error.message);
+      } else if (error.request) {
+        errorMessage += ': No se recibió respuesta del servidor';
+      } else {
+        errorMessage += ': ' + error.message;
+      }
+      alert(errorMessage);
     }
   };
 
@@ -422,6 +473,26 @@ const DeliveryShifts = () => {
             >
               Crear Turnos en Serie
             </button>
+          </div>
+
+          {/* Filter by Location dropdown */}
+          <div className="flex items-center space-x-2">
+            <label htmlFor="filterLocation" className="text-sm font-medium text-gray-700">
+              Filtrar por zona:
+            </label>
+            <select
+              id="filterLocation"
+              value={filterLocation}
+              onChange={(e) => setFilterLocation(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+            >
+              <option value="">Todas las zonas</option>
+              {locations.map(location => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {viewMode === 'calendar' && (

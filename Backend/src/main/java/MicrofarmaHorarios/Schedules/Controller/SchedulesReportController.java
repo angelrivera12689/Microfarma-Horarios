@@ -153,6 +153,19 @@ public class SchedulesReportController {
                     .body(new ApiResponseDto<>("Error al generar reporte por empleado: " + e.getMessage(), null, false));
         }
     }
+    
+    @GetMapping("/monthly/delivery")
+    public ResponseEntity<ApiResponseDto<ReportResponseDto>> generateMonthlyDeliveryReport(
+            @RequestParam int month,
+            @RequestParam int year) {
+        try {
+            ReportResponseDto report = reportService.generateDeliveryReport(month, year);
+            return ResponseEntity.ok(new ApiResponseDto<>("Reporte de domiciliarios generado exitosamente", report, true));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponseDto<>("Error al generar reporte de domiciliarios: " + e.getMessage(), null, false));
+        }
+    }
 
     @GetMapping("/global")
     public ResponseEntity<ApiResponseDto<GlobalReportDto>> generateGlobalReport(
@@ -298,6 +311,11 @@ public class SchedulesReportController {
                     report = reportService.generateReport(month, year);
                     filename = "reporte_" + year + "_" + month + ".pdf";
                     break;
+                case "delivery":
+                    logger.info("Generating delivery report for domiciliary employees");
+                    report = reportService.generateDeliveryReport(month, year);
+                    filename = "reporte_domiciliarios_" + year + "_" + month + ".pdf";
+                    break;
                 default:
                     logger.info("Generating general report");
                     report = reportService.generateReport(month, year);
@@ -348,8 +366,10 @@ public class SchedulesReportController {
             Color lightRed = new DeviceRgb(255, 235, 235);
             Color lightGray = new DeviceRgb(245, 245, 245);
             
-            // Header
-            addDocumentHeader(document, "REPORTE GENERAL DE HORAS", month, year);
+            // Header - change based on report type
+            String headerTitle = "delivery".equalsIgnoreCase(reportType) ? 
+                "REPORTE DE DOMICILIARIOS" : "REPORTE GENERAL DE HORAS";
+            addDocumentHeader(document, headerTitle, month, year);
 
             // Global summary
             document.add(new Paragraph("Resumen Global").setFontSize(14).setFontColor(ColorConstants.RED).setMarginTop(10));
