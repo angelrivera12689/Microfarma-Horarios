@@ -413,7 +413,7 @@ const DeliveryShifts = () => {
                     {shift.employee?.firstName} {shift.employee?.lastName}
                   </div>
                   <div className="text-green-800 truncate font-medium">
-                    {shift.shiftType?.name}
+                    {shift.location?.name}
                   </div>
                   <div className="text-green-700 text-xs font-mono">
                     {shift.shiftType?.startTime?.slice(0, 5)} - {shift.shiftType?.endTime?.slice(0, 5)}
