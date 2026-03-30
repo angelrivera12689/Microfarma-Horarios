@@ -421,8 +421,13 @@ const Shifts = () => {
   
   // Función para filtrar turnos del calendario
   const getFilteredCalendarShifts = () => {
+    // Si no hay sede seleccionada, no mostrar ningún turno
+    if (!calendarFilterLocation) {
+      return [];
+    }
+    
     return shifts.filter(shift => {
-      // Filtro por ubicación
+      // Filtro por ubicación - solo si se ha seleccionado una
       if (calendarFilterLocation) {
         const locationName = shift.location?.name || '';
         if (!locationName.toLowerCase().includes(calendarFilterLocation.toLowerCase())) {
@@ -568,16 +573,22 @@ const Shifts = () => {
 
           {viewMode === 'calendar' && (
             <div className="flex flex-wrap items-center gap-4 mb-4">
-              {/* Filtro por Ubicación para Calendario */}
+              {/* Filtro por Ubicación para Calendario - Solo mostrar ubicaciones con turnos */}
               <select
                 value={calendarFilterLocation}
                 onChange={(e) => setCalendarFilterLocation(e.target.value)}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
               >
-                <option value="">Todas las ubicaciones</option>
-                {locations.map(location => (
-                  <option key={location.id} value={location.name}>
-                    {location.name}
+                <option value="">Seleccione una sede</option>
+                {shifts.filter(shift => {
+                  // Filtrar turnos del mes/año actual
+                  const shiftDate = shift.date?.split('T')[0] || '';
+                  const month = currentMonth + 1;
+                  const year = currentYear;
+                  return shiftDate.startsWith(`${year}-${String(month).padStart(2, '0')}`);
+                }).map(shift => shift.location?.name).filter((value, index, self) => value && self.indexOf(value) === index).sort().map(locationName => (
+                  <option key={locationName} value={locationName}>
+                    {locationName}
                   </option>
                 ))}
               </select>

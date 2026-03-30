@@ -393,8 +393,15 @@ const DeliveryShifts = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const dayShifts = shifts
-        .filter(shift => shift.date?.startsWith(dateStr))
+      // Si no hay zona seleccionada, no mostrar ningún turno
+      const shiftsToShow = filterLocation 
+        ? shifts.filter(shift => 
+            shift.date?.startsWith(dateStr) && 
+            shift.location?.id === filterLocation
+          )
+        : [];
+      
+      const dayShifts = shiftsToShow
         .sort((a, b) => {
           const timeA = a.shiftType?.startTime || '00:00';
           const timeB = b.shiftType?.startTime || '00:00';
@@ -497,7 +504,7 @@ const DeliveryShifts = () => {
               </button>
           </div>
 
-          {/* Filter by Location dropdown */}
+          {/* Filter by Location dropdown - Solo mostrar zonas con turnos */}
           <div className="flex items-center space-x-2">
             <label htmlFor="filterLocation" className="text-sm font-medium text-gray-700">
               Filtrar por zona:
@@ -508,10 +515,19 @@ const DeliveryShifts = () => {
               onChange={(e) => setFilterLocation(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
             >
-              <option value="">Todas las zonas</option>
-              {locations.map(location => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
+              <option value="">Seleccione una zona</option>
+              {shifts.filter(shift => {
+                // Filtrar turnos del mes/año actual
+                const shiftDate = shift.date?.split('T')[0] || '';
+                const month = currentMonth + 1;
+                const year = currentYear;
+                return shiftDate.startsWith(`${year}-${String(month).padStart(2, '0')}`);
+              }).map(shift => shift.location?.id).filter((value, index, self) => value && self.indexOf(value) === index).map(locationId => {
+                const loc = locations.find(l => l.id === locationId);
+                return loc ? { id: loc.id, name: loc.name } : null;
+              }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name)).map(loc => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name}
                 </option>
               ))}
             </select>
