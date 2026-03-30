@@ -43,10 +43,17 @@ class ShiftService {
     }
   }
 
-  async downloadCalendarPdf(year, month, locationId) {
+  async downloadCalendarPdf(year, month, locationId, deliveryOnly = false) {
     let endpoint = `/api/schedules/shifts/pdf/${year}/${month}`;
+    const params = [];
     if (locationId) {
-      endpoint += `?locationId=${locationId}`;
+      params.push(`locationId=${locationId}`);
+    }
+    if (deliveryOnly) {
+      params.push('deliveryOnly=true');
+    }
+    if (params.length > 0) {
+      endpoint += '?' + params.join('&');
     }
     
     const blob = await apiClient.get(endpoint, {
@@ -57,7 +64,8 @@ class ShiftService {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `calendario_turnos_${year}_${String(month).padStart(2, '0')}.pdf`);
+      const suffix = deliveryOnly ? '_domiciliarios' : '';
+      link.setAttribute('download', `calendario_turnos_${year}_${String(month).padStart(2, '0')}${suffix}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();

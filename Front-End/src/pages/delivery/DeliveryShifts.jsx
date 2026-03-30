@@ -6,6 +6,7 @@ import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
 import { exportShiftsToExcel } from '../../services/excelExportService';
+// import { exportShiftsToPDF } from '../../services/pdfExportService'; // Ahora usamos el backend
 
 const DeliveryShifts = () => {
   const [shifts, setShifts] = useState([]);
@@ -440,39 +441,60 @@ const DeliveryShifts = () => {
 
       <div className="bg-white rounded-2xl shadow-xl p-6 border border-gray-100">
         <div className="flex flex-wrap gap-4 items-center mb-4">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setViewMode('table')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                viewMode === 'table'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Vista Tabla
-            </button>
-            <button
-              onClick={() => setViewMode('calendar')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                viewMode === 'calendar'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Vista Calendario
-            </button>
-            <button
-              onClick={exportToExcel}
-              className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
-            >
-              📊 Descargar Excel
-            </button>
-            <button
-              onClick={handleBulkAdd}
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
-            >
-              Crear Turnos en Serie
-            </button>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => setViewMode('table')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Vista Tabla
+              </button>
+              <button
+                onClick={() => setViewMode('calendar')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  viewMode === 'calendar'
+                    ? 'bg-green-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Vista Calendario
+              </button>
+              <button
+                onClick={exportToExcel}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors"
+              >
+                📊 Descargar Excel
+              </button>
+              <button
+                onClick={async () => {
+                  // Verificar si hay turnos para la zona seleccionada
+                  const zoneShifts = filterLocation 
+                    ? shifts.filter(s => s.location?.id === filterLocation)
+                    : shifts;
+                  
+                  if (zoneShifts.length === 0) {
+                    const zoneName = filterLocation 
+                      ? locations.find(l => l.id === filterLocation)?.name || 'esa zona'
+                      : 'todas las zonas';
+                    alert(`No hay turnos de domiciliarios para ${zoneName} en el mes actual. No se puede descargar el PDF.`);
+                    return;
+                  }
+                  
+                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, filterLocation || null, true);
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 transition-colors"
+              >
+                📄 Descargar PDF
+              </button>
+              <button
+                onClick={handleBulkAdd}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
+              >
+                Crear Turnos en Serie
+              </button>
           </div>
 
           {/* Filter by Location dropdown */}

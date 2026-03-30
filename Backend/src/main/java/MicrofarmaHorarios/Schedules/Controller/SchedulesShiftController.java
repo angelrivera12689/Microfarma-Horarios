@@ -112,12 +112,13 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
     @GetMapping("/pdf/{year}/{month}")
     public ResponseEntity<byte[]> generateCalendarPdf(@PathVariable int year, @PathVariable int month,
             @RequestParam(required = false) String locationId,
-            @RequestParam(required = false) String employeeId) {
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false, defaultValue = "false") boolean deliveryOnly) {
         try {
-            byte[] pdfBytes = service.generateCalendarPdf(year, month, locationId, employeeId);
+            byte[] pdfBytes = service.generateCalendarPdf(year, month, locationId, employeeId, deliveryOnly);
             String filename = "calendario_turnos_" + year + "_" + String.format("%02d", month);
-            if (locationId != null && !locationId.isEmpty()) {
-                filename += "_sede";
+            if (deliveryOnly) {
+                filename += "_domiciliarios";
             }
             if (employeeId != null && !employeeId.isEmpty()) {
                 filename += "_empleado";

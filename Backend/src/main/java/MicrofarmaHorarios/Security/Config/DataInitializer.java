@@ -241,7 +241,7 @@ public class DataInitializer implements CommandLineRunner {
      * Inicializa las 12 sucursales de la empresa
      */
     private java.util.List<Location> initializeLocations(Company company) throws Exception {
-        logger.info("[3/8] Inicializando 12 sucursales...");
+        logger.info("[3/8] Inicializando 13 sucursales...");
 
         java.util.List<Location> locations = new java.util.ArrayList<>();
         
@@ -258,7 +258,8 @@ public class DataInitializer implements CommandLineRunner {
             {"CAÑA BRAVA", "(601) 111-1009", "Av. 68 #24-60, Bogotá"},
             {"RIVERA", "(601) 111-1010", "Cl. 60 #14-28, Bogotá"},
             {"ZULUAGA", "(601) 111-1011", "Av. Chapinero #15-50, Bogotá"},
-            {"GIGANTE", "(601) 111-1012", "Cl. 30 #18-90, Bogotá"}
+            {"GIGANTE", "(601) 111-1012", "Cl. 30 #18-90, Bogotá"},
+            {"ADMINISTRACIÓN", "(601) 111-1013", "Cl. 150 #45-20, Bogotá"}
         };
 
         for (String[] data : locationData) {
@@ -335,12 +336,18 @@ public class DataInitializer implements CommandLineRunner {
 
         // Cargos base
         createPositionIfNotExists("GERENTE DE SUCURSAL", "Responsable de la operación de la sucursal", 2500000.0);
+        createPositionIfNotExists("GERENTE", "Gerente general de la empresa", 3000000.0);
+        createPositionIfNotExists("SUBGERENTE", "Subgerente de la empresa", 2800000.0);
         createPositionIfNotExists("AUXILIAR DE FARMACIA", "Encargado de la atención al cliente y dispensación de medicamentos", 1500000.0);
+        createPositionIfNotExists("AUXILIAR DE CONTABILIDAD", "Encargado de tareas contables y financieras", 1600000.0);
+        createPositionIfNotExists("AUXILIAR DE TESORERIA", "Encargado del manejo de caja y tesorería", 1550000.0);
+        createPositionIfNotExists("AUXILIAR DE BODEGA", "Encargado del manejo de inventario y recepción de mercancía", 1200000.0);
         createPositionIfNotExists("CAJERO", "Responsable de las transacciones y manejo de efectivo", 1400000.0);
         createPositionIfNotExists("ASESOR COMERCIAL", "Encargado de las ventas y atención al cliente", 1300000.0);
-        createPositionIfNotExists("AUXILIAR DE BODEGA", "Encargado del manejo de inventario y recepción de mercancía", 1200000.0);
+        createPositionIfNotExists("MENSAJERO/DOMICILIARIO", "Encargado de entregas y domicilios", 1100000.0);
+        createPositionIfNotExists("PASANTE", "Empleado en práctica o pasantía", 900000.0);
 
-        logger.info("    Cargos completados: 5");
+        logger.info("    Cargos completados: 11");
     }
 
     /**
@@ -379,7 +386,6 @@ public class DataInitializer implements CommandLineRunner {
             LocalTime.of(22, 0), LocalTime.of(7, 0), true);
         
         // Turno PARTIDO: Mañana (7am-1pm) y Tarde (5pm-10pm) - 8 horas con descanso de 4 horas
-        // This is the multi-range shift that requires proper time ranges
         createMultiRangeShiftTypeIfNotExists(
             "PARTIDO", 
             "Turno partido - 7am a 1pm y 5pm a 10pm (8 horas)",
@@ -470,66 +476,43 @@ public class DataInitializer implements CommandLineRunner {
     private void initializeEmployeesAndUsers(java.util.List<Location> locations) throws Exception {
         logger.info("[7/8] Inicializando empleados y usuarios...");
 
-        // Datos de empleados extraídos del PDF
-        // Formato: firstName, lastName, email, position, contractType, location, birthDate(MM-dd), contractEndDate(yyyy-MM-dd o null)
-        // Para pruebas de alertas: birthday 03-20 = hoy, contractEndDate cerca de hoy = alertas
+        // Datos de empleados reales
+        // Formato: estado, cedula, nombreCompleto, fechaNacimiento(dd/MM/yyyy), email, cargo, tipoContrato, ubicacion, fechaInicio(dd/MM/yyyy), fechaFin(dd/MM/yyyy o "")
         String[][] employeeData = {
-            // PINOS - 4 empleados (1 con cumpleaños hoy, 1 con contrato por vencer)
-            {"Yilver", "", "yilver@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS", "05-15", "2027-06-20"},
-            {"Stephania", "", "stephania@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "PINOS", "03-20", "2027-03-20"},  // ¡CUMPLEAÑOS HOY!
-            {"Juan Manuel", "", "juan.manuel@microfarma.com", "CAJERO", "TÉRMINO FIJO", "PINOS", "08-22", "2026-04-10"},  // Contrato por vencer
-            {"Marly", "", "marly@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "PINOS", "11-03", null},  // Indefinido
-            
-            // IPANEMA - 4 empleados (1 con contrato vencido)
-            {"Keara", "", "keara@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA", "01-10", "2027-01-10"},
-            {"Brayan Gonzalez", "", "brayan.gonzalez@microfarma.com", "CAJERO", "TÉRMINO INDEFINIDO", "IPANEMA", "06-25", null},
-            {"Laura Sofia", "", "laura.sofia@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "IPANEMA", "12-01", "2026-03-01"},  // Contrato vencido
-            {"Cristo Jesus", "", "cristo.jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "IPANEMA", "09-18", "2027-09-18"},
-            
-            // GUALANDAY - 2 empleados
-            {"Joselito Bernal", "", "joselito.bernal@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "GUALANDAY", "04-05", null},
-            {"Karol", "", "karol@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GUALANDAY", "07-30", "2026-04-25"},  // Por vencer
-            
-            // BUGANVILES - 2 empleados
-            {"Daniela Meñaca", "", "daniela.menaca@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BUGANVILES", "02-14", "2025-12-15"},  // Vencido
-            {"Luisa", "", "luisa@microfarma.com", "CAJERO", "TÉRMINO FIJO", "BUGANVILES", "10-20", "2027-10-20"},
-            
-            // BAMBU - 2 empleados
-            {"Jilber", "", "jilber@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "BAMBU", "03-15", "2026-04-05"},  // Por vencer
-            {"Leidy Bustos", "", "leidy.bustos@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "BAMBU", "05-22", "2027-05-22"},
-            
-            // LIMONAR - 2 empleados
-            {"Alejandro Hermosa", "", "alejandro.hermosa@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "LIMONAR", "08-08", null},
-            {"Melba", "", "melba@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "LIMONAR", "11-11", "2026-02-20"},  // Vencido
-            
-            // MANZANAREZ - 3 empleados
-            {"Karla", "", "karla@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MANZANAREZ", "01-25", "2027-01-25"},
-            {"Jhon", "", "jhon@microfarma.com", "CAJERO", "TÉRMINO FIJO", "MANZANAREZ", "06-10", "2026-04-18"},  // Por vencer
-            {"Yesica Serrato", "", "yesica.serrato@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MANZANAREZ", "12-31", "2027-12-31"},
-            
-            // MIRA RIO - 2 empleados
-            {"Jesus", "", "jesus@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MIRA RIO", "04-12", "2027-04-12"},
-            {"Yessica", "", "yessica@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "MIRA RIO", "03-21", "2026-04-08"},  // Por vencer, birthday mañana
-            
-            // CAÑA BRAVA - 2 empleados
-            {"Daniela Mosquera", "", "daniela.mosquera@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "CAÑA BRAVA", "07-07", "2027-07-07"},
-            {"Sergio Sosa", "", "sergio.sosa@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "CAÑA BRAVA", "10-15", "2026-01-10"},  // Vencido
-            
-            // RIVERA - 2 empleados
-            {"Mildred", "", "mildred@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "RIVERA", "02-28", "2027-02-28"},
-            {"Yurani", "", "yurani@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "RIVERA", "09-09", "2026-04-01"},  // Por vencer
-            
-            // ZULUAGA - 2 empleados
-            {"Cindy", "", "cindy@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "ZULUAGA", "03-19", "2027-03-19"},  // Birthday ayer
-            {"Miguel", "", "miguel@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "ZULUAGA", "05-05", "2027-05-05"},
-            
-            // GIGANTE - 3 empleados
-            {"Yudi", "", "yudi@microfarma.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "GIGANTE", "11-22", "2026-03-25"},  // Por vencer
-            {"Karoline", "", "karoline@microfarma.com", "ASESOR COMERCIAL", "TÉRMINO FIJO", "GIGANTE", "01-30", "2027-01-30"},
-            {"Johan", "", "johan@microfarma.com", "CAJERO", "TÉRMINO FIJO", "GIGANTE", "08-14", "2025-11-30"},  // Vencido
-            
-            // DANIEL CALDERÓN - RH (Administrador)
-            {"Daniel", "Calderón", "daniel.calderon@microfarma.com", "GERENTE DE SUCURSAL", "TÉRMINO INDEFINIDO", "PINOS", "03-20", null},  // ¡CUMPLEAÑOS HOY!
+            // 35 empleados reales
+            {"Pendiente", "1081152876", "Barrios Erly Yurani", "29/01/1987", "yuranibarrios2@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA RIVERA", "01/07/2024", "19/04/2026"},
+            {"Completo", "1077852267", "Joselito Bernal Aldana ", "09/04/1989", "joselitobernalaldana@hotmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO INDEFINIDO", "MICROFARMA GUALANDAY", "26/07/2025", "25/03/2026"},
+            {"Pendiente", "1081159676", "Bohorquez Puentes Leisa Mildred", "30/10/1996", "leisamildred6@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA RIVERA", "16/08/2024", "15/08/2026"},
+            {"Completo", "1075214747", "Bustos Mendez Leidy Yurani", "17/09/1986", "bleidy828@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA BAMBU", "17/07/2025", "16/03/2026"},
+            {"Pendiente", "1075314931", "Calderon Chavarro Marly Lorena", "18/09/1998", "marlylorenacalderonchavarro@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA PINOS", "01/07/2024", "19/01/2027"},
+            {"Completo", "1075304423", "Calderon Lozano Victor Daniel", "25/05/1997", "victor.calderon@microfarma.com", "GERENTE", "TÉRMINO FIJO", "ADMINISTRACIÓN", "01/07/2024", ""},
+            {"Completo", "1075598061", "Castellano Luisa Fernanda", "30/07/2003", "lufercaste3007@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO INDEFINIDO", "MICROFARMA BUGANVILES", "20/05/2025", "19/05/2026"},
+            {"Pendiente", "1079606460", "Chambo Diaz Stephania", "09/08/1992", "stephania090892@hotmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA PINOS", "01/07/2024", "25/10/2026"},
+            {"Completo", "1031168692", "Cortes Medina Yilver Manuel", "13/10/1996", "yilvermedina134@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA PINOS", "01/07/2024", "31/01/2027"},
+            {"Pendiente", "1007677625", "Cumbe Quintero Juana Manuela", "21/03/2000", "juanacumbeq@gmail.com", "AUXILIAR DE CONTABILIDAD", "TÉRMINO FIJO", "ADMINISTRACIÓN", "01/07/2024", "01/12/2026"},
+            {"Completo", "1075211838", "Flor Perdomo Jhon Jairo", "12/04/1986", "jhonper121@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA MANZANARES", "01/07/2024", "03/05/2026"},
+            {"Completo", "36068293", "Flor Perdomo Melba", "09/11/1978", "melbaperdomo2019@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA LIMONAR", "01/07/2024", "30/06/2026"},
+            {"Pendiente", "1006484816", "Garcia Sanchez Yesica", "25/04/2002", "yesicasanch25@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA MIRA RIO", "01/07/2024", "01/02/2027"},
+            {"Pendiente", "7730178", "Gomez Gaviria Wilson", "05/01/1985", "wilson.gomez@microfarma.com", "MENSAJERO/DOMICILIARIO", "TÉRMINO FIJO", "ADMINISTRACIÓN", "16/07/2024", "15/07/2026"},
+            {"Completo", "1081159183", "Hermosa Molano Jose Alejandro", "29/10/1995", "alejandrohermosa125@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA LIMONAR", "01/07/2024", "14/01/2027"},
+            {"Pendiente", "1007659484", "Laguna Lozada Yessica Maria", "04/09/2001", "yessicalaguna04@gmail.com", "AUXILIAR DE TESORERIA", "TÉRMINO FIJO", "ADMINISTRACIÓN", "02/07/2024", "01/07/2026"},
+            {"Pendiente", "1059810140", "Lima Gomez Alejandro", "09/11/1985", "alejandro.lima@microfarma.com", "AUXILIAR DE BODEGA", "TÉRMINO FIJO", "ADMINISTRACIÓN", "01/07/2024", "14/06/2026"},
+            {"Completo", "1080186903", "Lopez Santos Judy Marcela", "09/12/1994", "ymlopezsantos2016@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA GIGANTE", "08/02/2025", "07/02/2027"},
+            {"Completo", "1075299487", "Meñaca Lara Daniela Alejandra", "09/09/1996", "alejandralara091996@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA BUGANVILES", "22/03/2025", "21/03/2026"},
+            {"Pendiente", "1075307336", "Medina Zuñiga Jilber", "26/08/1997", "jilbermedina26@hotmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA BAMBU", "01/07/2024", "14/01/2027"},
+            {"Completo", "1079390598", "Montilla Montilla Jesus David", "22/12/1994", "194jesus.david@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA MIRA RIO", "01/07/2024", "31/08/2026"},
+            {"Pendiente", "1023366302", "Mosquera Castro Yarith Daniela", "06/10/2004", "mosqueradaniela896@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA CAÑA BRAVA", "01/07/2024", "14/01/2027"},
+            {"Completo", "7703003", "Mosquera Garcia John Harixon", "10/11/1976", "johnharixonm@gmail.com", "MENSAJERO/DOMICILIARIO", "TÉRMINO FIJO", "ADMINISTRACIÓN", "16/07/2025", "15/04/2026"},
+            {"Completo", "1077858119", "Motta Gaviria Cindy Brigitte", "09/10/1990", "cindybrigittemottagaviria@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA ZULUAGA", "01/07/2024", "04/06/2026"},
+            {"Pendiente", "1003809563", "Muñoz Bustos Karol Daniela", "16/05/2002", "karolbustos16@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA GUALANDAY", "01/07/2024", "19/01/2027"},
+            {"Pendiente", "1075285919", "Perdomo Hernandez Robinson", "27/01/1995", "robinperdomo2701@gmail.com", "MENSAJERO/DOMICILIARIO", "TÉRMINO FIJO", "ADMINISTRACIÓN", "17/04/2025", "16/04/2026"},
+            {"Completo", "1004155952", "Quintero Cardozo Karla Tatiana", "11/06/2003", "karlatati1106@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO INDEFINIDO", "MICROFARMA MANZANARES", "27/12/2025", "26/04/2026"},
+            {"Pendiente", "1081160990", "Ramirez Gonzalez Juan Manuel", "18/04/1999", "januel0418@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA PINOS", "01/07/2024", "14/01/2027"},
+            {"Pendiente", "1075231948", "Rivera Suarez Angel Farid", "25/09/2006", "angelfaridr1@gmail.com", "PASANTE", "TÉRMINO INDEFINIDO", "ADMINISTRACIÓN", "15/12/2025", "14/06/2026"},
+            {"Completo", "1075279605", "Rueda Arias Teylor Mauricio", "01/02/1994", "teylorrueda4@gmail.com", "MENSAJERO/DOMICILIARIO", "TÉRMINO INDEFINIDO", "ADMINISTRACIÓN", "23/09/2025", "22/03/2026"},
+            {"Completo", "1075263597", "Serrato Proaños Yesica Lorena", "02/04/1992", "lorena12345@gmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO INDEFINIDO", "MICROFARMA MANZANARES", "16/05/2025", "15/05/2026"},
+            {"Pendiente", "1077874441", "Trujillo Polo Miguel Angel", "28/02/1997", "mangelt24@hotmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA ZULUAGA", "01/07/2024", "02/05/2026"},
+            {"Completo", "1080188100", "Villanueva Penagos Karolayn", "31/10/1996", "karolayn_villa@hotmail.com", "AUXILIAR DE FARMACIA", "TÉRMINO FIJO", "MICROFARMA GIGANTE", "01/07/2024", "26/03/2026"}
         };
 
         int successCount = 0;
@@ -537,17 +520,97 @@ public class DataInitializer implements CommandLineRunner {
 
         for (String[] empData : employeeData) {
             try {
-                String firstName = empData[0];
-                String lastName = empData[1];
-                String email = empData[2];
-                String positionName = empData[3];
-                String contractTypeName = empData[4];
-                String locationName = empData[5];
-                String birthDateStr = empData[6];  // MM-dd format
-                String contractEndDateStr = empData[7];  // yyyy-MM-dd or null
+                String estado = empData[0];
+                String cedula = empData[1];
+                String nombreCompleto = empData[2];
+                String fechaNacimientoStr = empData[3];
+                String email = empData[4];
+                String positionName = empData[5];
+                String contractTypeName = empData[6];
+                String ubicacion = empData[7];
+                String fechaInicioStr = empData[8];
+                String fechaFinStr = empData[9];
 
+                // Procesar nombres: formato original "Apellido Paterno Apellido Materno Nombre1 Nombre2"
+                // Debo invertir: primeros elementos = apellidos, últimos = nombres
+                String firstName = "";
+                String lastName = "";
+                if (nombreCompleto != null && !nombreCompleto.isEmpty()) {
+                    String trimmed = nombreCompleto.trim();
+                    String[] parts = trimmed.split(" ");
+                    
+                    if (parts.length == 1) {
+                        // Solo un nombre o apellido
+                        firstName = parts[0];
+                        lastName = "";
+                    } else if (parts.length == 2) {
+                        // Nombre y apellido (ej: "Yilver Manuel")
+                        firstName = parts[0] + " " + parts[1];
+                        lastName = "";
+                    } else if (parts.length == 3) {
+                        // 1 nombre + 2 apellidos (ej: "Cortes Medina Yilver")
+                        firstName = parts[2];
+                        lastName = parts[0] + " " + parts[1];
+                    } else if (parts.length >= 4) {
+                        // 4+ partes: últimos 2 = nombres, primeros 2 = apellidos
+                        // ej: "Cortes Medina Yilver Manuel" → firstName="Yilver Manuel", lastName="Cortes Medina"
+                        firstName = parts[parts.length - 2] + " " + parts[parts.length - 1];
+                        lastName = parts[0] + " " + parts[1];
+                    }
+                }
+
+                // Parsear fecha de nacimiento (solo día/mes, año 2000 placeholder)
+                LocalDate birthDate = null;
+                if (fechaNacimientoStr != null && !fechaNacimientoStr.isEmpty()) {
+                    try {
+                        String[] parts = fechaNacimientoStr.split("/");
+                        int day = Integer.parseInt(parts[0]);
+                        int month = Integer.parseInt(parts[1]);
+                        birthDate = LocalDate.of(2000, month, day);
+                    } catch (Exception e) {
+                        logger.warn("Fecha de nacimiento inválida '{}' para {}", fechaNacimientoStr, firstName);
+                    }
+                }
+
+                // Parsear fecha de inicio de contrato
+                LocalDate hireDate = null;
+                if (fechaInicioStr != null && !fechaInicioStr.isEmpty()) {
+                    try {
+                        String[] parts = fechaInicioStr.split("/");
+                        int day = Integer.parseInt(parts[0]);
+                        int month = Integer.parseInt(parts[1]);
+                        int year = Integer.parseInt(parts[2]);
+                        hireDate = LocalDate.of(year, month, day);
+                    } catch (Exception e) {
+                        logger.warn("Fecha de inicio inválida '{}' para {}", fechaInicioStr, firstName);
+                    }
+                }
+
+                // Parsear fecha de fin de contrato
+                LocalDate contractEndDate = null;
+                if (fechaFinStr != null && !fechaFinStr.isEmpty()) {
+                    try {
+                        String[] parts = fechaFinStr.split("/");
+                        int day = Integer.parseInt(parts[0]);
+                        int month = Integer.parseInt(parts[1]);
+                        int year = Integer.parseInt(parts[2]);
+                        contractEndDate = LocalDate.of(year, month, day);
+                    } catch (Exception e) {
+                        logger.warn("Fecha de fin inválida '{}' para {}", fechaFinStr, firstName);
+                    }
+                }
+
+                // 👇 MODIFICACIÓN: todos los empleados se crean con status = true (Completo)
+                boolean status = true;  // Ignorar el campo 'estado'
+
+                // Buscar ubicación (quitar "MICROFARMA " del nombre)
+                String locationName = ubicacion;
+                if (locationName.startsWith("MICROFARMA ")) {
+                    locationName = locationName.substring("MICROFARMA ".length());
+                }
+                final String finalLocationName = locationName;
                 Location location = locations.stream()
-                    .filter(l -> l.getName().equals(locationName))
+                    .filter(l -> l.getName().equals(finalLocationName))
                     .findFirst()
                     .orElse(null);
 
@@ -557,39 +620,16 @@ public class DataInitializer implements CommandLineRunner {
                     continue;
                 }
 
-                // Parse birth date (MM-dd format, year doesn't matter for birthday alerts)
-                LocalDate birthDate = null;
-                if (birthDateStr != null && !birthDateStr.isEmpty()) {
-                    try {
-                        String[] parts = birthDateStr.split("-");
-                        int month = Integer.parseInt(parts[0]);
-                        int day = Integer.parseInt(parts[1]);
-                        birthDate = LocalDate.of(2000, month, day);  // Year 2000 as placeholder
-                    } catch (Exception e) {
-                        logger.warn("    Fecha de nacimiento inválida '{}' para {}", birthDateStr, firstName);
-                    }
-                }
-
-                // Parse contract end date
-                LocalDate contractEndDate = null;
-                if (contractEndDateStr != null && !contractEndDateStr.isEmpty() && !contractEndDateStr.equals("null")) {
-                    try {
-                        contractEndDate = LocalDate.parse(contractEndDateStr);
-                    } catch (Exception e) {
-                        logger.warn("    Fecha de fin de contrato inválida '{}' para {}", contractEndDateStr, firstName);
-                    }
-                }
-
-                createEmployeeAndUser(firstName, lastName, email, positionName, contractTypeName, location, birthDate, contractEndDate);
+                createEmployeeAndUser(firstName, lastName, email, positionName, contractTypeName, location,
+                        birthDate, hireDate, contractEndDate, status);
                 successCount++;
-                
-                // Log birthday/contract info for debugging
-                String birthdayMsg = birthDate != null ? " [CUMPLE: " + birthDateStr + "]" : "";
-                String contractMsg = contractEndDate != null ? " [CONTRATO: " + contractEndDateStr + "]" : " [CONTRATO: indefinido]";
-                logger.info("  - Empleado '{} {}' creado en {}{}{}", firstName, lastName, locationName, birthdayMsg, contractMsg);
-                
+
+                String birthdayMsg = birthDate != null ? " [CUMPLE: " + fechaNacimientoStr + "]" : "";
+                String contractMsg = contractEndDate != null ? " [CONTRATO: " + fechaFinStr + "]" : " [CONTRATO: indefinido]";
+                logger.info("  - Empleado '{} {}' creado en {}{}{} (Estado: Activo)", firstName, lastName, locationName, birthdayMsg, contractMsg);
+
             } catch (Exception e) {
-                logger.error("    Error al crear empleado {}: {}", empData[0], e.getMessage());
+                logger.error("    Error al crear empleado {}: {}", empData[2], e.getMessage());
                 errorCount++;
             }
         }
@@ -600,22 +640,22 @@ public class DataInitializer implements CommandLineRunner {
     /**
      * Crea un empleado y su usuario asociado
      */
-    private void createEmployeeAndUser(String firstName, String lastName, String email, 
-            String positionName, String contractTypeName, Location location, 
-            LocalDate birthDate, LocalDate contractEndDate) throws Exception {
-        
+    private void createEmployeeAndUser(String firstName, String lastName, String email,
+            String positionName, String contractTypeName, Location location,
+            LocalDate birthDate, LocalDate hireDate, LocalDate contractEndDate, boolean status) throws Exception {
+
         // Obtener cargo
         Position position = positionRepository.findFirstByNameIgnoreCase(positionName)
             .orElseThrow(() -> new Exception("Cargo no encontrado: " + positionName));
-        
+
         // Obtener tipo de contrato
         ContractType contractType = contractTypeRepository.findFirstByNameIgnoreCase(contractTypeName)
             .orElseThrow(() -> new Exception("Tipo de contrato no encontrado: " + contractTypeName));
-        
-        // Verificar si el empleado ya existe
+
+        // Verificar si el empleado ya existe por email
         String fullName = (firstName + " " + lastName).trim();
         java.util.Optional<Employee> existingEmployee = employeeRepository.findByEmail(email);
-        
+
         Employee employee;
         if (existingEmployee.isPresent()) {
             logger.debug("    El empleado '{}' ya existe", fullName);
@@ -628,24 +668,25 @@ public class DataInitializer implements CommandLineRunner {
             employee.setEmail(email);
             employee.setPosition(position);
             employee.setContractType(contractType);
-            employee.setHireDate(TODAY.minusMonths(6));  // Fecha de contratación 6 meses antes
-            employee.setBirthDate(birthDate);  // Fecha de nacimiento para alertas de cumpleaños
-            employee.setContractEndDate(contractEndDate);  // Fecha de fin de contrato
-            employee.setStatus(true);
-            
+            employee.setHireDate(hireDate != null ? hireDate : TODAY.minusMonths(6)); // fallback si no se pudo parsear
+            employee.setBirthDate(birthDate);
+            employee.setContractEndDate(contractEndDate);
+            employee.setStatus(status);
+            // Podrías asignar teléfono y dirección si los tuvieras, aquí se dejan nulos
+
             employee = employeeRepository.save(employee);
             logger.info("    Nuevo empleado creado: {} {}", firstName, lastName);
         }
-        
+
         // Crear usuario para el empleado si no existe
         if (userService.findByEmail(email).isEmpty()) {
             User user = new User();
             user.setName(fullName);
             user.setEmail(email);
             user.setPasswordHash(passwordEncoder.encode("microfarma2026"));
-            user.setActive(true);
+            user.setActive(status); // Usuario activo si el empleado está activo
             user.setEmployee(employee);
-            
+
             // Asignar rol según el cargo
             Role role;
             if (positionName.contains("GERENTE")) {
@@ -654,13 +695,13 @@ public class DataInitializer implements CommandLineRunner {
                 role = roleService.findByName("EMPLOYEE").orElse(null);
             }
             user.setRole(role);
-            
+
             userService.save(user);
             logger.info("    Usuario creado para: {} (Rol: {})", email, role != null ? role.getName() : "EMPLOYEE");
         } else {
             logger.debug("    El usuario '{}' ya existe", email);
         }
-        
+
         // Crear EmployeeLocation para vincular empleado con ubicación
         createEmployeeLocation(employee, location);
     }
@@ -673,13 +714,13 @@ public class DataInitializer implements CommandLineRunner {
         java.util.List<EmployeeLocation> existingRelations = employeeLocationRepository.findByEmployeeId(employee.getId());
         boolean relationExists = existingRelations.stream()
             .anyMatch(el -> el.getLocation().getId().equals(location.getId()));
-        
+
         if (!relationExists) {
             EmployeeLocation employeeLocation = new EmployeeLocation();
             employeeLocation.setEmployee(employee);
             employeeLocation.setLocation(location);
             employeeLocationRepository.save(employeeLocation);
-            logger.debug("    Relación empleado-ubicación creada: {} -> {}", 
+            logger.debug("    Relación empleado-ubicación creada: {} -> {}",
                 employee.getFirstName(), location.getName());
         }
     }
@@ -689,27 +730,27 @@ public class DataInitializer implements CommandLineRunner {
      */
     private void createSystemAdministrator() throws Exception {
         logger.info("[8/8] Creando administrador del sistema...");
-        
+
         String adminEmail = "admin@microfarma.com";
-        
+
         // Verificar si ya existe el administrador
         if (userService.findByEmail(adminEmail).isPresent()) {
             logger.info("    El administrador '{}' ya existe", adminEmail);
             return;
         }
-        
+
         // Crear usuario administrador
         User adminUser = new User();
         adminUser.setName("Administrador del Sistema");
         adminUser.setEmail(adminEmail);
         adminUser.setPasswordHash(passwordEncoder.encode("adminMF2026*"));
         adminUser.setActive(true);
-        
+
         // Asignar rol ADMIN
         Role adminRole = roleService.findByName("ADMIN")
             .orElseThrow(() -> new Exception("Rol ADMIN no encontrado"));
         adminUser.setRole(adminRole);
-        
+
         userService.save(adminUser);
         logger.info("    Administrador del sistema creado: {}", adminEmail);
         logger.info("    NOTA: Por seguridad, cambie la contraseña en el primer inicio de sesión");
