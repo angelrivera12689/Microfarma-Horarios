@@ -177,6 +177,22 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
         return typeName;
     }
 
+    // Extraer nombre de zona de la ubicación (ej: "Zona Norte" -> "Norte", "Las Américas 3 Norte" -> "Norte")
+    private String extractZoneName(String locationName) {
+        if (locationName == null) return "";
+        String lower = locationName.toLowerCase();
+        if (lower.contains("norte")) return "Norte";
+        if (lower.contains("sur")) return "Sur";
+        if (lower.contains("oriente") || lower.contains("oriente")) return "Oriente";
+        if (lower.contains("occidente") || lower.contains("occidente")) return "Occidente";
+        if (lower.contains("zona")) {
+            // Extraer lo que viene después de "zona"
+            String afterZone = lower.replace("zona", "").trim();
+            return afterZone.substring(0, 1).toUpperCase() + afterZone.substring(1);
+        }
+        return locationName;
+    }
+
     // Formato: PrimerNombre Inicial. (ej: Teylor R.) - Primer nombre + inicial del primer apellido
     // El nombre completo debe tener: firstName = nombres, lastName = apellidos
     private String formatEmployeeName(String firstName, String lastName) {
@@ -199,7 +215,9 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
     public byte[] generatePersonalShiftsPdf(String employeeId) throws Exception {
         // (este método no se modifica, pero lo incluyo igual)
         try {
-            List<Shift> shifts = findByEmployeeId(employeeId);
+            List<Shift> shifts = findByEmployeeId(employeeId).stream()
+                .filter(s -> s.getStatus() != null && s.getStatus())
+                .toList();
             if (shifts.isEmpty()) {
                 throw new Exception("No se encontraron turnos para este empleado");
             }
@@ -299,14 +317,6 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
 
             document.add(table);
 
-            Paragraph footer = new Paragraph("Sistema de Gestión de Turnos - Microfarma | Generado el " +
-                java.time.LocalDate.now().toString())
-                .setFontSize(8)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setFontColor(ColorConstants.GRAY)
-                .setMarginTop(20);
-            document.add(footer);
-
             document.close();
             return baos.toByteArray();
         } catch (Exception e) {
@@ -363,7 +373,7 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
             LocalDate startDate = LocalDate.of(year, month, 1);
             LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
             List<Shift> shifts = findByDateBetween(startDate, endDate).stream()
-                .filter(s -> s.getEmployee() != null)
+                .filter(s -> s.getEmployee() != null && s.getStatus() != null && s.getStatus())
                 .toList();
             
             // Filter for delivery employees only if requested
@@ -434,6 +444,8 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                 mainTitle = "Empleado: " + headerTitle;
             } else if (locationId != null && !locationId.isEmpty()) {
                 mainTitle = "Sede: " + locationName;
+            } else if (deliveryOnly) {
+                mainTitle = "Reporte General de Domiciliarios";
             }
 
             Paragraph title = new Paragraph(mainTitle)
@@ -563,9 +575,20 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                             }
                         }
 
+                        // Si es deliveryOnly y no hay location (reporte general), mostrar zona
+                        // Si hay location, mostrar tipo de turno
+                        String shiftInfo;
+                        if (deliveryOnly && (locationId == null || locationId.isEmpty())) {
+                            String zoneName = shift.getLocation() != null ? 
+                                extractZoneName(shift.getLocation().getName()) : "";
+                            shiftInfo = zoneName;
+                        } else {
+                            shiftInfo = shiftAbbr;
+                        }
+                        
                         StringBuilder line = new StringBuilder();
                         line.append(employeeName);
-                        line.append(" · ").append(shiftAbbr);
+                        line.append(" · ").append(shiftInfo);
                         if (!isDescanso && !time.isEmpty()) {
                             line.append(" · ").append(time);
                         }
@@ -593,14 +616,6 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
             }
 
             document.add(table);
-
-            Paragraph footer = new Paragraph("Sistema de Gestión de Turnos - Microfarma | Generado el " +
-                java.time.LocalDate.now().toString())
-                .setFontSize(7)
-                .setTextAlignment(TextAlignment.CENTER)
-                .setFontColor(ColorConstants.GRAY)
-                .setMarginTop(14);
-            document.add(footer);
 
             document.close();
             return baos.toByteArray();

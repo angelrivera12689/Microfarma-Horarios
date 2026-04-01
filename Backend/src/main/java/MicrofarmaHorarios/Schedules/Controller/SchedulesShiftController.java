@@ -116,12 +116,21 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
             @RequestParam(required = false, defaultValue = "false") boolean deliveryOnly) {
         try {
             byte[] pdfBytes = service.generateCalendarPdf(year, month, locationId, employeeId, deliveryOnly);
-            String filename = "calendario_turnos_" + year + "_" + String.format("%02d", month);
-            if (deliveryOnly) {
-                filename += "_domiciliarios";
-            }
-            if (employeeId != null && !employeeId.isEmpty()) {
-                filename += "_empleado";
+            String filename;
+            // Si es reporte general de domiciliarios (sin location), usar nombre diferente
+            if (deliveryOnly && (locationId == null || locationId.isEmpty()) && (employeeId == null || employeeId.isEmpty())) {
+                filename = "reporte_general_domiciliarios_" + year + "_" + String.format("%02d", month);
+            } else {
+                filename = "calendario_turnos_" + year + "_" + String.format("%02d", month);
+                if (deliveryOnly) {
+                    filename += "_domiciliarios";
+                }
+                if (employeeId != null && !employeeId.isEmpty()) {
+                    filename += "_empleado";
+                }
+                if (locationId != null && !locationId.isEmpty()) {
+                    filename += "_zona";
+                }
             }
             filename += ".pdf";
             HttpHeaders headers = new HttpHeaders();

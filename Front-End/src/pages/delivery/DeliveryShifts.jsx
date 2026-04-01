@@ -393,13 +393,13 @@ const DeliveryShifts = () => {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      // Si no hay zona seleccionada, no mostrar ningún turno
+      // Si hay zona seleccionada, filtrar por zona; si no, mostrar todas las zonas
       const shiftsToShow = filterLocation 
         ? shifts.filter(shift => 
             shift.date?.startsWith(dateStr) && 
             shift.location?.id === filterLocation
           )
-        : [];
+        : shifts.filter(shift => shift.date?.startsWith(dateStr));
       
       const dayShifts = shiftsToShow
         .sort((a, b) => {
@@ -424,7 +424,17 @@ const DeliveryShifts = () => {
                     {shift.location?.name}
                   </div>
                   <div className="text-green-700 text-xs font-mono">
-                    {shift.shiftType?.startTime?.slice(0, 5)} - {shift.shiftType?.endTime?.slice(0, 5)}
+                    {(() => {
+                      const formatTimeWithAmPm = (time) => {
+                        if (!time) return '';
+                        const [hours, minutes] = time.split(':');
+                        const h = parseInt(hours, 10);
+                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        const h12 = h % 12 || 12;
+                        return `${h12}:${minutes}${ampm}`;
+                      };
+                      return `${formatTimeWithAmPm(shift.shiftType?.startTime)} - ${formatTimeWithAmPm(shift.shiftType?.endTime)}`;
+                    })()}
                   </div>
                 </div>
               ))
@@ -501,6 +511,28 @@ const DeliveryShifts = () => {
                 className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
               >
                 Crear Turnos en Serie
+              </button>
+              <button
+                onClick={async () => {
+                  // Verificar si hay turnos de domiciliarios en el mes actual
+                  const monthShifts = allShifts.filter(shift => {
+                    const shiftDate = shift.date?.split('T')[0] || '';
+                    const month = currentMonth + 1;
+                    const year = currentYear;
+                    return shiftDate.startsWith(`${year}-${String(month).padStart(2, '0')}`);
+                  });
+                  
+                  if (monthShifts.length === 0) {
+                    alert('No hay turnos de domiciliarios en el mes actual. No se puede descargar el reporte general.');
+                    return;
+                  }
+                  
+                  // Descargar PDF general sin filtro de zona
+                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, null, true);
+                }}
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg font-medium hover:bg-orange-600 transition-colors"
+              >
+                📋 Reporte General
               </button>
           </div>
 
