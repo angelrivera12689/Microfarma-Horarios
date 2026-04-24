@@ -140,107 +140,180 @@ const MonthlyReport = () => {
   };
 
   const generatePDF = async () => {
-    if (!reportData) return;
+  if (!reportData) return;
 
-    setLoading(true);
-    const monthName = months.find(m => m.value === reportData.month)?.label;
-    
-    try {
-      // Create a temporary container for the report content
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.style.width = '1100px';
-      container.style.padding = '20px';
-      container.style.background = 'white';
-      container.style.fontFamily = 'Arial, sans-serif';
-      
-      container.innerHTML = `
-        <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #dc2626; padding-bottom: 10px;">
-          <h1 style="color: #dc2626; font-size: 24px; margin-bottom: 5px;">MICROFARMA HORARIOS</h1>
-          <div style="color: #666; font-size: 14px;">Reporte de Horas - ${monthName} ${reportData.year}</div>
-          <div style="color: #666; font-size: 12px; margin-top: 5px;">Total empleados: ${reportData.employees.length}</div>
+  setLoading(true);
+  const monthName = months.find(m => m.value === reportData.month)?.label;
+  const generatedDate = new Date(reportData.generatedAt).toLocaleDateString('es-CO', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  });
+  
+  try {
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    container.style.width = '780px';
+    container.style.padding = '40px 50px';
+    container.style.background = 'white';
+    container.style.fontFamily = 'Georgia, serif';
+
+    container.innerHTML = `
+      <!-- ENCABEZADO INSTITUCIONAL -->
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #991b1b; padding-bottom: 16px; margin-bottom: 24px;">
+        <div>
+          <div style="font-size: 22px; font-weight: bold; color: #991b1b; letter-spacing: 1px;">MICROFARMA</div>
+          <div style="font-size: 11px; color: #555; margin-top: 2px;">Sistema de Gestión de Recursos Humanos</div>
         </div>
+        <div style="text-align: right; font-size: 10px; color: #666; line-height: 1.6;">
+          <div><strong>Documento:</strong> RH-HORAS-${reportData.year}-${String(reportData.month).padStart(2,'0')}</div>
+          <div><strong>Fecha de emisión:</strong> ${generatedDate}</div>
+          <div><strong>Período:</strong> ${monthName} ${reportData.year}</div>
+        </div>
+      </div>
 
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px;">
-          <thead>
-            <tr style="background: #dc2626; color: white;">
-              <th style="padding: 8px; text-align: center;">EMPLEADO</th>
-              <th style="padding: 8px; text-align: center;">UBICACIÓN</th>
-              <th style="padding: 8px; text-align: center;">ORDINARIAS</th>
-              <th style="padding: 8px; text-align: center;">DIURNAS</th>
-              <th style="padding: 8px; text-align: center;">NOCTURNAS</th>
-              <th style="padding: 8px; text-align: center;">EXTRA F/DOM</th>
-              <th style="padding: 8px; text-align: center;">DOMINICALES</th>
-              <th style="padding: 8px; text-align: center;">TOTAL HORAS</th>
+      <!-- TÍTULO OFICIAL -->
+      <div style="text-align: center; margin-bottom: 28px;">
+        <div style="font-size: 15px; font-weight: bold; color: #111; letter-spacing: 0.5px; text-transform: uppercase;">
+          Reporte Mensual de Horas Trabajadas
+        </div>
+        <div style="font-size: 12px; color: #555; margin-top: 6px;">
+          Período correspondiente al mes de <strong>${monthName}</strong> del año <strong>${reportData.year}</strong>
+        </div>
+      </div>
+
+      <!-- CUERPO DE REDACCIÓN FORMAL -->
+      <div style="font-size: 11px; color: #333; line-height: 1.85; text-align: justify; margin-bottom: 28px; padding: 18px 20px; background: #fafafa; border-left: 4px solid #dc2626; border-radius: 2px;">
+        El presente documento certifica el registro oficial de horas laboradas por el personal vinculado a 
+        <strong>Microfarma</strong> durante el período comprendido en el mes de <strong>${monthName} de ${reportData.year}</strong>. 
+        La información aquí consignada ha sido consolidada a partir de los registros de asignación de turnos y 
+        plantillas horarias del sistema de gestión, discriminando las horas según su naturaleza: ordinarias, 
+        horas extra diurnas, horas extra nocturnas, horas extra en festivos y dominicales, conforme a la 
+        normatividad laboral vigente en la República de Colombia (Código Sustantivo del Trabajo).
+        <br/><br/>
+        El reporte comprende un total de <strong>${reportData.employees.length} empleado(s)</strong>, 
+        con una sumatoria global de <strong>${reportData.grandTotals.totalHours.toFixed(2)} horas</strong> 
+        registradas en el período. Este documento debe ser revisado, validado y firmado por el responsable 
+        del área de Talento Humano y el representante legal o su delegado, como constancia de conformidad 
+        con la información presentada.
+      </div>
+
+      <!-- TABLA DE DATOS -->
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 9.5px;">
+        <thead>
+          <tr style="background: #991b1b; color: white;">
+            <th style="padding: 9px 10px; text-align: left; font-weight: 600; letter-spacing: 0.3px;">EMPLEADO</th>
+            <th style="padding: 9px 10px; text-align: left; font-weight: 600;">UBICACIÓN</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">ORDINARIAS</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">EXT. DIURNAS</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">EXT. NOCT.</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">EXTRA F/DOM</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">DOMINICALES</th>
+            <th style="padding: 9px 8px; text-align: center; font-weight: 600;">TOTAL HRS</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${reportData.employees.map((emp, i) => `
+            <tr style="background: ${i % 2 === 0 ? '#ffffff' : '#fef2f2'};">
+              <td style="padding: 7px 10px; border-bottom: 1px solid #e5e7eb; color: #111; font-weight: 500;">${emp.employeeName}</td>
+              <td style="padding: 7px 10px; border-bottom: 1px solid #e5e7eb; color: #444;">${emp.locationName}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #333;">${emp.ordinarias > 0 ? emp.ordinarias.toFixed(2) : '—'}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #333;">${emp.diurnas > 0 ? emp.diurnas.toFixed(2) : '—'}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #333;">${emp.nocturnas > 0 ? emp.nocturnas.toFixed(2) : '—'}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #333;">${emp.extraFDom > 0 ? emp.extraFDom.toFixed(2) : '—'}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; color: #333;">${emp.dominicales > 0 ? emp.dominicales.toFixed(2) : '—'}</td>
+              <td style="padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; font-weight: bold; color: #111;">${emp.totalHours.toFixed(2)}</td>
             </tr>
-          </thead>
-          <tbody>
-            ${reportData.employees.map(emp => `
-              <tr>
-                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${emp.employeeName}</td>
-                <td style="padding: 6px; text-align: left; border: 1px solid #ddd;">${emp.locationName}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.ordinarias > 0 ? emp.ordinarias.toFixed(2) : '-'}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.diurnas > 0 ? emp.diurnas.toFixed(2) : '-'}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.nocturnas > 0 ? emp.nocturnas.toFixed(2) : '-'}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.extraFDom > 0 ? emp.extraFDom.toFixed(2) : '-'}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${emp.dominicales > 0 ? emp.dominicales.toFixed(2) : '-'}</td>
-                <td style="padding: 6px; text-align: center; border: 1px solid #ddd; font-weight: bold;">${emp.totalHours.toFixed(2)}</td>
-              </tr>
-            `).join('')}
-            <tr style="background: #fef3c7; font-weight: bold;">
-              <td colspan="2" style="padding: 6px; text-align: center; border: 1px solid #ddd;"><strong>TOTALES GENERALES</strong></td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.ordinarias.toFixed(2)}</td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.diurnas.toFixed(2)}</td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.nocturnas.toFixed(2)}</td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.extraFDom.toFixed(2)}</td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd;">${reportData.grandTotals.dominicales.toFixed(2)}</td>
-              <td style="padding: 6px; text-align: center; border: 1px solid #ddd; font-weight: bold;">${reportData.grandTotals.totalHours.toFixed(2)}</td>
-            </tr>
-          </tbody>
-        </table>
+          `).join('')}
+          <!-- FILA TOTALES -->
+          <tr style="background: #991b1b;">
+            <td colspan="2" style="padding: 9px 10px; color: white; font-weight: bold; font-size: 10px; letter-spacing: 0.3px;">TOTALES GENERALES</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold;">${reportData.grandTotals.ordinarias.toFixed(2)}</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold;">${reportData.grandTotals.diurnas.toFixed(2)}</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold;">${reportData.grandTotals.nocturnas.toFixed(2)}</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold;">${reportData.grandTotals.extraFDom.toFixed(2)}</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold;">${reportData.grandTotals.dominicales.toFixed(2)}</td>
+            <td style="padding: 9px 8px; text-align: center; color: white; font-weight: bold; font-size: 11px;">${reportData.grandTotals.totalHours.toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
 
-        <div style="display: flex; justify-content: space-around; margin-top: 20px; padding: 15px; background: #f0fdf4; border-radius: 4px;">
-          <div style="text-align: center;">
-            <div style="font-size: 12px; color: #666;">Total Empleados</div>
-            <div style="font-size: 18px; font-weight: bold; color: #166534;">${reportData.employees.length}</div>
-          </div>
-          <div style="text-align: center;">
-            <div style="font-size: 12px; color: #666;">Total Horas</div>
-            <div style="font-size: 18px; font-weight: bold; color: #166534;">${reportData.grandTotals.totalHours.toFixed(2)}</div>
+      <div style="font-size: 9px; color: #888; text-align: right; margin-bottom: 40px;">
+        * Valores expresados en horas decimales. Período: ${monthName} ${reportData.year}.
+      </div>
+
+      <!-- DECLARACIÓN DE CONFORMIDAD -->
+      <div style="font-size: 10.5px; color: #333; line-height: 1.8; text-align: justify; margin-bottom: 50px;">
+        En constancia de lo anterior, las partes abajo firmantes declaran haber revisado el contenido del 
+        presente reporte y certifican que la información registrada corresponde fielmente a los datos 
+        del sistema de gestión de horarios de <strong>Microfarma</strong> para el período indicado. 
+        Este documento tiene validez como soporte para liquidación de nómina y archivo de gestión del 
+        talento humano.
+      </div>
+
+      <!-- CAMPOS DE FIRMA -->
+      <div style="display: flex; justify-content: space-between; margin-top: 10px; gap: 30px;">
+        
+        <div style="flex: 1; text-align: center;">
+          <div style="border-top: 1.5px solid #333; padding-top: 10px; margin-top: 60px;">
+            <div style="font-size: 10px; font-weight: bold; color: #111; margin-top: 4px;">RESPONSABLE DE TALENTO HUMANO</div>
+            <div style="font-size: 9px; color: #666; margin-top: 6px;">Nombre: _______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">C.C. No.: ______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Cargo: _________________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Fecha: _________________________________</div>
           </div>
         </div>
 
-        <div style="text-align: center; margin-top: 20px; font-size: 10px; color: #999;">
-          <p>Sistema de Gestión de Horarios - Microfarma</p>
+        <div style="flex: 1; text-align: center;">
+          <div style="border-top: 1.5px solid #333; padding-top: 10px; margin-top: 60px;">
+            <div style="font-size: 10px; font-weight: bold; color: #111; margin-top: 4px;">EMPLEADO</div>
+            <div style="font-size: 9px; color: #666; margin-top: 6px;">Nombre: _______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">C.C. No.: ______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Cargo: _________________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Fecha: _________________________________</div>
+          </div>
         </div>
-      `;
-      
-      document.body.appendChild(container);
-      
-      // Use html2canvas to capture the content
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(container, { scale: 2 });
-      
-      document.body.removeChild(container);
-      
-      // Create PDF
-      const pdf = new jsPDF('l', 'mm', 'a4');
-      const imgData = canvas.toDataURL('image/png');
-      const imgWidth = 287;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
-      pdf.save(`reporte_horas_${monthName}_${reportData.year}.pdf`);
-      
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Error al generar el PDF');
-    } finally {
-      setLoading(false);
-    }
-  };
 
+        <div style="flex: 1; text-align: center;">
+          <div style="border-top: 1.5px solid #333; padding-top: 10px; margin-top: 60px;">
+            <div style="font-size: 10px; font-weight: bold; color: #111; margin-top: 4px;">REVISOR / AUDITOR</div>
+            <div style="font-size: 9px; color: #666; margin-top: 6px;">Nombre: _______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">C.C. No.: ______________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Cargo: _________________________________</div>
+            <div style="font-size: 9px; color: #666; margin-top: 3px;">Fecha: _________________________________</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PIE DE PÁGINA -->
+      <div style="margin-top: 40px; border-top: 1px solid #ddd; padding-top: 12px; display: flex; justify-content: space-between; font-size: 8.5px; color: #aaa;">
+        <span>Microfarma — Sistema de Gestión de Horarios</span>
+        <span>Documento generado el ${generatedDate} | Confidencial — Uso interno</span>
+        <span>Pág. 1 de 1</span>
+      </div>
+    `;
+
+    document.body.appendChild(container);
+
+    const html2canvas = (await import('html2canvas')).default;
+    const canvas = await html2canvas(container, { scale: 2, useCORS: true });
+
+    document.body.removeChild(container);
+
+    const pdf = new jsPDF('p', 'mm', 'letter');
+    const imgData = canvas.toDataURL('image/png');
+    const imgWidth = 196;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+    pdf.save(`reporte_horas_${monthName}_${reportData.year}.pdf`);
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error al generar el PDF');
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <div className="p-6">
       {/* Header */}

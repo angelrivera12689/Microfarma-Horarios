@@ -18,6 +18,26 @@ const DataTable = ({
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  // Helper function to get nested value from object
+  const getNestedValue = (obj, path) => {
+    return path.split('.').reduce((current, key) => current?.[key], obj);
+  };
+
+  // Helper function to check if value contains search term
+  const valueMatchesSearch = (value, searchLower) => {
+    if (value === null || value === undefined) return false;
+    // Handle arrays
+    if (Array.isArray(value)) {
+      return value.some(item => valueMatchesSearch(item, searchLower));
+    }
+    // Handle objects (but not null)
+    if (typeof value === 'object') {
+      return Object.values(value).some(v => valueMatchesSearch(v, searchLower));
+    }
+    // Handle primitives
+    return value.toString().toLowerCase().includes(searchLower);
+  };
+
   // Filter data based on search term and specific fields
   const filteredData = data.filter(item => {
     const searchLower = searchTerm.toLowerCase();
@@ -25,29 +45,14 @@ const DataTable = ({
     // If searchFields is specified, only search in those fields
     if (searchFields && searchFields.length > 0) {
       return searchFields.some(field => {
-        const value = item[field];
-        if (value === null || value === undefined) return false;
-        // Handle nested objects like role.name
-        if (typeof value === 'object') {
-          return Object.values(value).some(v => 
-            v && v.toString().toLowerCase().includes(searchLower)
-          );
-        }
-        return value.toString().toLowerCase().includes(searchLower);
+        // Support nested fields like 'role.name'
+        const value = field.includes('.') ? getNestedValue(item, field) : item[field];
+        return valueMatchesSearch(value, searchLower);
       });
     }
     
     // Default: search in all fields
-    return Object.values(item).some(value => {
-      if (value === null || value === undefined) return false;
-      // Handle nested objects
-      if (typeof value === 'object') {
-        return Object.values(value).some(v => 
-          v && v.toString().toLowerCase().includes(searchLower)
-        );
-      }
-      return value.toString().toLowerCase().includes(searchLower);
-    });
+    return Object.values(item).some(value => valueMatchesSearch(value, searchLower));
   });
 
   // Pagination
@@ -137,7 +142,7 @@ const DataTable = ({
                     <div key={colIndex} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
                       <span className="font-medium text-gray-600 text-sm">{column.header}:</span>
                       <span className="text-gray-900 text-sm text-right">
-                        {column.render ? column.render(item[column.key], item) : item[column.key]}
+                        {column.render ? column.render(column.key.includes('.') ? getNestedValue(item, column.key) : item[column.key], item) : (column.key.includes('.') ? getNestedValue(item, column.key) : item[column.key])}
                       </span>
                     </div>
                   ))}
@@ -190,7 +195,7 @@ const DataTable = ({
                     <tr key={item.id || index} className="hover:bg-gray-50 transition-colors duration-200">
                       {columns.map((column, colIndex) => (
                         <td key={colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {column.render ? column.render(item[column.key], item) : item[column.key]}
+                          {column.render ? column.render(column.key.includes('.') ? getNestedValue(item, column.key) : item[column.key], item) : (column.key.includes('.') ? getNestedValue(item, column.key) : item[column.key])}
                         </td>
                       ))}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

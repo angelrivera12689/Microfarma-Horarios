@@ -1,0 +1,60 @@
+# .env y archivos sensibles
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Maven
+target/
+*.jar
+*.war
+*.nar
+*.ear
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+.flattened-pom.xml
+.m2/
+
+# Node
+node_modules/
+dist/
+.cache
+npm-debug.log
+yarn-error.log
+
+# Spring Boot
+application-local.properties
+application-dev.properties
+logs/
+*.log
+
+# Base de datos
+*.sql.bak
+*.db
+*.sqlite
+
+# Tests
+coverage/
+.nyc_output/
+
+# Docker
+docker-compose.override.yml
+
+# Build outputs
+build/
+out/
+*.class

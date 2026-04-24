@@ -1,6 +1,7 @@
 package MicrofarmaHorarios.Schedules.Controller;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -197,6 +199,37 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
         try {
             List<Shift> savedShifts = service.saveAll(shifts);
             return ResponseEntity.ok(new ApiResponseDto<List<Shift>>("Turnos guardados en bulk", savedShifts, true));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(new ApiResponseDto<List<Shift>>(e.getMessage(), null, false));
+        }
+    }
+
+    @PatchMapping("/bulk")
+    @org.springframework.transaction.annotation.Transactional
+    public ResponseEntity<ApiResponseDto<List<Shift>>> updateBulk(@RequestBody List<Shift> shifts) {
+        try {
+            List<Shift> updatedShifts = new ArrayList<>();
+            for (Shift shift : shifts) {
+                if (shift.getId() == null || shift.getId().isEmpty()) {
+                    continue;
+                }
+                // Verify shift exists
+                Optional<Shift> existingOpt = shiftRepository.findById(shift.getId());
+                if (existingOpt.isEmpty()) {
+                    continue;
+                }
+                // Use native query to only update shift_type_id (safe approach)
+                if (shift.getShiftType() != null && shift.getShiftType().getId() != null) {
+                    shiftRepository.updateShiftTypeOnly(shift.getId(), shift.getShiftType().getId());
+                }
+                // Update notes if provided
+                if (shift.getNotes() != null) {
+                    shiftRepository.updateShiftNotes(shift.getId(), shift.getNotes());
+                }
+                // Fetch and add to response
+                updatedShifts.add(shiftRepository.findById(shift.getId()).get());
+            }
+            return ResponseEntity.ok(new ApiResponseDto<List<Shift>>("Turnos actualizados en bulk", updatedShifts, true));
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body(new ApiResponseDto<List<Shift>>(e.getMessage(), null, false));
         }

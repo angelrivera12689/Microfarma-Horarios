@@ -39,36 +39,37 @@ import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 public class ExcelExportService {
 
     // ============================================
-    // PALETA DE COLORES PROFESIONAL - Microfarma
+    // PALETA DE COLORES - DROGUERÍA MICROFARMA
     // ============================================
     
-    // Colores primarios - Azul corporativo profesional
-    private static final Color PRIMARY_BLUE = new Color(0, 51, 102);        // Azul oscuro corporativo
-    private static final Color PRIMARY_BLUE_LIGHT = new Color(0, 82, 153);   // Azul medio
-    private static final Color PRIMARY_BLUE_EXTRALIGHT = new Color(51, 122, 183); // Azul claro
+    // Colores corporativos Droguería Microfarma - ROJO Y BLANCO
+    private static final Color MICROFARMA_RED = new Color(200, 16, 46);       // Rojo vivo corporativo
+    private static final Color MICROFARMA_RED_DARK = new Color(150, 0, 30);    // Rojo oscuro
+    private static final Color MICROFARMA_WHITE = Color.WHITE;                   // Blanco puro
+    private static final Color MICROFARMA_RED_LIGHT = new Color(255, 240, 240);   // Rojo muy claro (fondo filas impares)
+    private static final Color MICROFARMA_RED_MEDIUM = new Color(255, 200, 200); // Rojo medio claro
     
-    // Colores secundarios - Verde azulado para acentos
-    private static final Color ACCENT_TEAL = new Color(0, 128, 128);        // Verde azulado
-    private static final Color ACCENT_TEAL_LIGHT = new Color(72, 176, 146);  // Verde azulado claro
-    
-    // Colores нейтральные - Grises profesionales
-    private static final Color GRAY_DARK = new Color(64, 64, 64);           // Gris oscuro
-    private static final Color GRAY_MEDIUM = new Color(128, 128, 128);       // Gris medio
-    private static final Color GRAY_LIGHT = new Color(217, 217, 217);        // Gris claro
-    private static final Color GRAY_EXTRALIGHT = new Color(245, 245, 245);   // Gris muy claro
+    // Colores neutros
+    private static final Color GRAY_DARK = new Color(64, 64, 64);              // Gris oscuro
+    private static final Color GRAY_MEDIUM = new Color(128, 128, 128);    // Gris medio
+    private static final Color GRAY_LIGHT = new Color(217, 217, 217);   // Gris claro
+    private static final Color GRAY_EXTRALIGHT = new Color(245, 245, 245); // Gris muy claro
     
     // Colores para filas alternadas
-    private static final Color ROW_EVEN = Color.WHITE;                      // Blanco para filas pares
-    private static final Color ROW_ODD = new Color(240, 248, 255);          // Azul muy claro AliceBlue
+    private static final Color ROW_EVEN = Color.WHITE;                 // Blanco para filas pares
+    private static final Color ROW_ODD = new Color(255, 240, 240);      // Rojo muy claro para filas impares
     
     // Colores para estados/condiciones
-    private static final Color SUCCESS_GREEN = new Color(34, 139, 34);       // Verde éxito
-    private static final Color WARNING_ORANGE = new Color(255, 140, 0);      // Naranja advertencia
-    private static final Color DANGER_RED = new Color(220, 20, 60);          // Rojo peligro
+    private static final Color SUCCESS_GREEN = new Color(34, 139, 34);    // Verde éxito
+    private static final Color WARNING_ORANGE = new Color(255, 140, 0);   // Naranja advertencia
+    private static final Color DANGER_RED = new Color(200, 16, 46);        // Rojo peligro (same as Microfarma Red)
+    
+    // Constante para heures extras base
+    private static final double OVERTIME_THRESHOLD = 220.0;  // Horas extras después de 220
     
     // Colores de encabezado
-    private static final Color HEADER_BLUE = new Color(0, 82, 153);         // Azul encabezado
-    private static final Color HEADER_BLUE_DARK = new Color(0, 51, 102);     // Azul oscuro
+    private static final Color HEADER_RED = new Color(200, 16, 46);      // Rojo encabezado
+    private static final Color HEADER_RED_DARK = new Color(150, 0, 30);      // Rojo oscuro
     
     // ============================================
     // MÉTODO PRINCIPAL DE EXPORTACIÓN
@@ -136,9 +137,16 @@ public class ExcelExportService {
         // Título principal
         Row titleRow = sheet.createRow(rowNum++);
         Cell titleCell = titleRow.createCell(0);
-        titleCell.setCellValue("INFORME DE HORARIOS - MICROFARMA");
+        titleCell.setCellValue("🏥 DROGUERÍA MICROFARMA");
         titleCell.setCellStyle(titleStyle);
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 2));
+        
+        // Subtítulo informativo
+        Row infoRow = sheet.createRow(rowNum++);
+        Cell infoCell = infoRow.createCell(0);
+        infoCell.setCellValue("Informe de Horas Laboradas");
+        infoCell.setCellStyle(subtitleStyle);
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
         
         // Subtítulo con período
         Row subtitleRow = sheet.createRow(rowNum++);
@@ -363,7 +371,7 @@ public class ExcelExportService {
         String[] headers = {
             "ID EMPLEADO", "NOMBRE COMPLETO", "DÍAS LAB.", "TURNOS", 
             "HORAS TOTALES", "PROM/DÍA", "PROM/SEMANA", 
-            "HORAS EXTRAS", "REGULARES", "EXTRA DIURNA", 
+            "EXTRAS (>220H)", "REGULARES", "EXTRA DIURNA", 
             "EXTRA NOCTURNA", "DOMINICALES", "FESTIVAS"
         };
         
@@ -391,9 +399,16 @@ public class ExcelExportService {
             createDataCell(dataRow, 5, formatNumber(emp.getDailyAvgHours()), style);
             createDataCell(dataRow, 6, formatNumber(emp.getWeeklyTotalHours()), style);
             
-            // Aplicar estilo de advertencia si hay muchas horas extras
-            CellStyle overtimeStyle = emp.getOvertimeHours() != null && emp.getOvertimeHours() > 20 ? overtimeWarningStyle : style;
-            createDataCell(dataRow, 7, formatNumber(emp.getOvertimeHours()), overtimeStyle);
+            // Aplicar estilo de advertencia si hay más de 220 horas totales
+            // Fórmula: =IF(E{fila}>220, E{fila}-220, 0) para calcular horas extras después de 220
+            CellStyle overtimeStyle = emp.getTotalHours() != null && emp.getTotalHours() > OVERTIME_THRESHOLD ? overtimeWarningStyle : style;
+            
+            // Crear celda con fórmula de Excel que calcula horas extras después de 220
+            Cell cell = dataRow.createCell(7);
+            int formulaRow = rowNum; // rowNum tiene el valor correcto de la fila
+            String formula = "=IF(E" + formulaRow + ">220, E" + formulaRow + "-220, 0)";
+            cell.setCellFormula(formula);
+            cell.setCellStyle(overtimeStyle);
             
             createDataCell(dataRow, 8, formatNumber(emp.getRegularHours()), style);
             createDataCell(dataRow, 9, formatNumber(emp.getDiurnaExtraHours()), style);
@@ -422,8 +437,8 @@ public class ExcelExportService {
             createDataCell(totalRow, 12, formatNumber(employees.stream().mapToDouble(e -> e.getFestivoHours() != null ? e.getFestivoHours() : 0).sum()), totalStyle);
         }
         
-        // Formato condicional para horas extras > 20
-        applyConditionalFormatting(sheet, 3, rowNum - 1, 7, 20.0);
+        // Formato condicional para horas extras > 220
+        applyConditionalFormatting(sheet, 3, rowNum - 1, 7, OVERTIME_THRESHOLD);
     }
     
     // ============================================
@@ -431,24 +446,29 @@ public class ExcelExportService {
     // ============================================
     
     /**
-     * Crea estilo para títulos principales
+     * Crea estilo para títulos principales - Droguería Microfarma
      */
     private CellStyle createTitleStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         
+        // Fondo blanco
+        style.setFillForegroundColor(IndexedColors.WHITE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        
+        // Fuente roja corporativa
         Font font = workbook.createFont();
         font.setBold(true);
-        font.setFontHeightInPoints((short) 18);
-        font.setColor(IndexedColors.DARK_BLUE.getIndex());
+        font.setFontHeightInPoints((short) 20);
+        font.setColor(IndexedColors.RED.getIndex());
         font.setFontName("Calibri");
         
         style.setFont(font);
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         
-        // Borde inferior doble
+        // Borde inferior grueso rojo
         style.setBorderBottom(BorderStyle.MEDIUM);
-        style.setBottomBorderColor(IndexedColors.DARK_BLUE.getIndex());
+        style.setBottomBorderColor(IndexedColors.RED.getIndex());
         
         return style;
     }
@@ -472,13 +492,14 @@ public class ExcelExportService {
     }
     
     /**
-     * Crea estilo para encabezados de tabla
+     * Crea estilo para encabezados de tabla - Droguería Microfarma
+     * Fondo rojo con texto blanco
      */
     private CellStyle createHeaderStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         
-        // Fondo azul corporativo
-        style.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+        // Fondo rojo corporativo Microfarma
+        style.setFillForegroundColor(IndexedColors.RED.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         
         // Fuente blanca y negrita
@@ -497,10 +518,10 @@ public class ExcelExportService {
         style.setBorderBottom(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.GREY_50_PERCENT.getIndex());
-        style.setBottomBorderColor(IndexedColors.GREY_50_PERCENT.getIndex());
-        style.setLeftBorderColor(IndexedColors.GREY_50_PERCENT.getIndex());
-        style.setRightBorderColor(IndexedColors.GREY_50_PERCENT.getIndex());
+        style.setTopBorderColor(IndexedColors.DARK_RED.getIndex());
+        style.setBottomBorderColor(IndexedColors.DARK_RED.getIndex());
+        style.setLeftBorderColor(IndexedColors.DARK_RED.getIndex());
+        style.setRightBorderColor(IndexedColors.DARK_RED.getIndex());
         
         // Ajuste de texto
         style.setWrapText(true);
@@ -605,21 +626,22 @@ public class ExcelExportService {
     }
     
     /**
-     * Crea estilo para fila de totales
+     * Crea estilo para fila de totales - Droguería Microfarma
+     * Fondo rojo con texto blanco
      */
     private CellStyle createTotalStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         
-        // Fondo gris claro
-        style.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        // Fondo rojo corporativo
+        style.setFillForegroundColor(IndexedColors.RED.getIndex());
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         
-        // Fuente negrita
+        // Fuente blanca y negrita
         Font font = workbook.createFont();
         font.setBold(true);
         font.setFontHeightInPoints((short) 11);
         font.setFontName("Calibri");
-        font.setColor(IndexedColors.BLACK.getIndex());
+        font.setColor(IndexedColors.WHITE.getIndex());
         
         style.setFont(font);
         style.setAlignment(HorizontalAlignment.CENTER);
@@ -630,38 +652,41 @@ public class ExcelExportService {
         style.setBorderBottom(BorderStyle.MEDIUM);
         style.setBorderLeft(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.BLACK.getIndex());
-        style.setBottomBorderColor(IndexedColors.BLACK.getIndex());
+        style.setTopBorderColor(IndexedColors.DARK_RED.getIndex());
+        style.setBottomBorderColor(IndexedColors.DARK_RED.getIndex());
         
         return style;
     }
     
     /**
-     * Crea estilo para advertencia de horas extras excesivas
+     * Crea estilo para advertencia de horas extras excesivas (>220 horas)
+     * Fondo rojo claro con texto rojo oscuro
      */
     private CellStyle createOvertimeWarningStyle(Workbook workbook) {
         CellStyle style = workbook.createCellStyle();
         
-        // Fondo naranja claro
-        style.setFillForegroundColor(IndexedColors.LIGHT_ORANGE.getIndex());
+        // Fondo rojo muy claro (rosa)
+        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex()); // Using light blue as substitute for light pink
         style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
         
-        // Fuente roja oscura
+        // Fuente roja corporativa
         Font font = workbook.createFont();
         font.setBold(true);
         font.setFontHeightInPoints((short) 10);
         font.setFontName("Calibri");
-        font.setColor(IndexedColors.DARK_RED.getIndex());
+        font.setColor(IndexedColors.RED.getIndex());
         
         style.setFont(font);
         style.setAlignment(HorizontalAlignment.CENTER);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         
-        // Bordes
+        // Bordes rojos
         style.setBorderTop(BorderStyle.THIN);
         style.setBorderBottom(BorderStyle.THIN);
         style.setBorderLeft(BorderStyle.THIN);
         style.setBorderRight(BorderStyle.THIN);
+        style.setTopBorderColor(IndexedColors.RED.getIndex());
+        style.setBottomBorderColor(IndexedColors.RED.getIndex());
         
         return style;
     }

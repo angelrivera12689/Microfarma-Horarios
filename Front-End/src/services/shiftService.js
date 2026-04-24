@@ -95,6 +95,12 @@ class ShiftService {
     return response;
   }
 
+  async updateBulkShifts(shifts) {
+    // Array of {id, ...updateData}
+    const response = await apiClient.patch('/api/schedules/shifts/bulk', shifts);
+    return response;
+  }
+
   async checkExistingShift(employeeId, date) {
     const response = await apiClient.get(`/api/schedules/shifts/check?employeeId=${employeeId}&date=${date}`);
     return response;

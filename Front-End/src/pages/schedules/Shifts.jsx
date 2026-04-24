@@ -57,6 +57,95 @@ const Shifts = () => {
     notes: ''
   });
 
+
+  const [bulkEditModalOpen, setBulkEditModalOpen] = useState(false);
+  const [bulkEditFormData, setBulkEditFormData] = useState({
+    startDate: '',
+    endDate: '',
+    employeeId: '',
+    locationId: '',
+    newShiftTypeId: ''
+  });
+
+  // Handle bulk edit - open modal
+  const handleBulkEdit = () => {
+    setBulkEditFormData({
+      startDate: '',
+      endDate: '',
+      employeeId: '',
+      locationId: '',
+      newShiftTypeId: ''
+    });
+    setBulkEditModalOpen(true);
+  };
+
+  // Handle bulk edit submit
+  const handleBulkEditSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!bulkEditFormData.startDate || !bulkEditFormData.endDate) {
+      alert('Por favor complete las fechas de inicio y fin');
+      return;
+    }
+    
+    if (!bulkEditFormData.newShiftTypeId) {
+      alert('Por favor seleccione el nuevo tipo de turno');
+      return;
+    }
+
+    // Filter shifts by the specified criteria
+    const matchingShifts = shifts.filter(shift => {
+      const shiftDate = shift.date ? shift.date.split('T')[0] : '';
+      const inDateRange = shiftDate >= bulkEditFormData.startDate && shiftDate <= bulkEditFormData.endDate;
+      
+      // If employee filter is set, check if matches
+      const matchesEmployee = !bulkEditFormData.employeeId || 
+        shift.employee?.id === bulkEditFormData.employeeId;
+      
+      // If location filter is set, check if matches
+      const matchesLocation = !bulkEditFormData.locationId || 
+        shift.location?.id === bulkEditFormData.locationId;
+      
+      return inDateRange && matchesEmployee && matchesLocation;
+    });
+
+    // Safety limit: prevent bulk updates larger than 10 shifts
+    const MAX_BULK_LIMIT = 10;
+    if (matchingShifts.length > MAX_BULK_LIMIT) {
+      alert(`⚠️ Límite de seguridad excedido.\n\nSe encontraron ${matchingShifts.length} turnos pero el máximo permitido es ${MAX_BULK_LIMIT}.\n\nPor favor usa filtros más específicos (empleado o ubicación) para reduzir el número de turnos a modificar.`);
+      return;
+    }
+
+    if (matchingShifts.length === 0) {
+      alert('No se encontraron turnos que coincidan con los criterios seleccionados');
+      return;
+    }
+
+    if (!window.confirm(`¿Estás seguro de actualizar ${matchingShifts.length} turnos al nuevo tipo de turno?`)) {
+      return;
+    }
+
+    try {
+      const shiftsToUpdate = matchingShifts.map(shift => ({
+        id: shift.id,
+        shiftType: { id: bulkEditFormData.newShiftTypeId }
+      }));
+      
+      const result = await shiftService.updateBulkShifts(shiftsToUpdate);
+      
+      if (result.status === true) {
+        alert(`✓ Se actualizaron ${matchingShifts.length} turnos correctamente`);
+        setBulkEditModalOpen(false);
+        await loadShifts();
+      } else {
+        alert(`Error: ${result.message || 'No se pudo actualizar los turnos'}`);
+      }
+    } catch (error) {
+      console.error('Error en bulk edit:', error);
+      alert('Error al actualizar turnos. Por favor intenta de nuevo.');
+    }
+  };
+
   // Calculate shifts to be created for preview
   const getBulkShiftsPreview = () => {
     if (!bulkFormData.startDate || !bulkFormData.endDate) return [];
@@ -553,6 +642,12 @@ const Shifts = () => {
               className="px-4 py-2 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 transition-colors"
             >
               Crear Turnos en Serie
+            </button>
+            <button
+              onClick={handleBulkEdit}
+              className="px-4 py-2 bg-indigo-500 text-white rounded-lg font-medium hover:bg-indigo-600 transition-colors"
+            >
+              ✏️ Editar en Masa
             </button>
             {viewMode === 'calendar' && (
               <button
@@ -1128,6 +1223,253 @@ const Shifts = () => {
               className="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
             >
               Crear {getBulkShiftsPreview().length > 0 ? getBulkShiftsPreview().length : ''} Turnos
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Bulk Edit Modal - Edit shifts by range */}
+      <Modal
+        isOpen={bulkEditModalOpen}
+        onClose={() => setBulkEditModalOpen(false)}
+        title="Editar Turnos en Masa"
+        size="lg"
+      >
+        <form onSubmit={handleBulkEditSubmit} className="space-y-6">
+          <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+            <p className="text-sm text-blue-800">
+              Selecciona el rango de fechas y filtros para actualizar múltiples turnos a un nuevo tipo de turno.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="bulkEditStartDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Inicio *
+              </label>
+              <input
+                type="date"
+                id="bulkEditStartDate"
+                value={bulkEditFormData.startDate}
+                onChange={(e) => setBulkEditFormData({...bulkEditFormData, startDate: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              />
+            </div>
+            <div>
+              <label htmlFor="bulkEditEndDate" className="block text-sm font-medium text-gray-700 mb-2">
+                Fecha Fin *
+              </label>
+              <input
+                type="date"
+                id="bulkEditEndDate"
+                value={bulkEditFormData.endDate}
+                onChange={(e) => setBulkEditFormData({...bulkEditFormData, endDate: e.target.value})}
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="bulkEditEmployee" className="block text-sm font-medium text-gray-700 mb-2">
+                Empleado (opcional - dejar vacío para todos)
+              </label>
+              <select
+                id="bulkEditEmployee"
+                value={bulkEditFormData.employeeId}
+                onChange={(e) => setBulkEditFormData({...bulkEditFormData, employeeId: e.target.value})}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              >
+                <option value="">Todos los empleados</option>
+                {employees.map(employee => (
+                  <option key={employee.id} value={employee.id}>
+                    {employee.firstName} {employee.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="bulkEditLocation" className="block text-sm font-medium text-gray-700 mb-2">
+                Ubicación (opcional - dejar vacío para todas)
+              </label>
+              <select
+                id="bulkEditLocation"
+                value={bulkEditFormData.locationId}
+                onChange={(e) => setBulkEditFormData({...bulkEditFormData, locationId: e.target.value})}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              >
+                <option value="">Todas las ubicaciones</option>
+                {locations.map(location => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="bulkEditNewShiftType" className="block text-sm font-medium text-gray-700 mb-2">
+              Nuevo Tipo de Turno *
+            </label>
+            <select
+              id="bulkEditNewShiftType"
+              value={bulkEditFormData.newShiftTypeId}
+              onChange={(e) => setBulkEditFormData({...bulkEditFormData, newShiftTypeId: e.target.value})}
+              required
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+            >
+              <option value="">Seleccionar tipo de turno</option>
+              {shiftTypes.map(shiftType => (
+                <option key={shiftType.id} value={shiftType.id}>
+                  {shiftType.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Preview Section */}
+          {bulkEditFormData.startDate && bulkEditFormData.endDate && (
+            <div className={`mt-4 rounded-lg p-4 border ${(() => {
+              const matching = shifts.filter(s => {
+                const d = s.date ? s.date.split('T')[0] : '';
+                const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                return inRange && empMatch && locMatch;
+              });
+              return matching.length > 10 ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200';
+            })()}`}>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-yellow-800">
+                  Vista Previa de Turnos a Modificar
+                </h4>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${(() => {
+                  const matching = shifts.filter(s => {
+                    const d = s.date ? s.date.split('T')[0] : '';
+                    const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                    const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                    const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                    return inRange && empMatch && locMatch;
+                  });
+                  return matching.length > 10 ? 'bg-red-200 text-red-800' : 'bg-yellow-200 text-yellow-800';
+                })()}`}>
+                  {(() => {
+                    const matching = shifts.filter(s => {
+                      const d = s.date ? s.date.split('T')[0] : '';
+                      const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                      const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                      const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                      return inRange && empMatch && locMatch;
+                    });
+                    return matching.length;
+                  })()} turnos encontrados
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto border border-yellow-300 rounded">
+                <table className="min-w-full divide-y divide-yellow-200">
+                  <thead className="bg-yellow-100 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Fecha</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Empleado</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Ubicación</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-yellow-800 uppercase">Turno Actual</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-yellow-200">
+                    {shifts
+                      .filter(s => {
+                        const d = s.date ? s.date.split('T')[0] : '';
+                        const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                        const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                        const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                        return inRange && empMatch && locMatch;
+                      })
+                      .slice(0, 20)
+                      .map(shift => (
+                        <tr key={shift.id} className="hover:bg-yellow-50">
+                          <td className="px-3 py-2 text-sm text-gray-700">
+                            {shift.date ? new Date(shift.date).toLocaleDateString('es-CO') : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-700">
+                            {shift.employee ? `${shift.employee.firstName} ${shift.employee.lastName}` : '-'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-700">
+                            {shift.location?.name || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-700">
+                            {shift.shiftType?.name || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+                {shifts.filter(s => {
+                  const d = s.date ? s.date.split('T')[0] : '';
+                  const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                  const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                  const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                  return inRange && empMatch && locMatch;
+                }).length > 20 && (
+                  <div className="px-3 py-2 bg-yellow-100 text-center text-xs text-yellow-700">
+                    ... y más turnos
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setBulkEditModalOpen(false)}
+              className="px-6 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors duration-200 font-medium"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={(() => {
+                // Check if too many shifts
+                if (!bulkEditFormData.startDate || !bulkEditFormData.endDate || !bulkEditFormData.newShiftTypeId) return true;
+                const matching = shifts.filter(s => {
+                  const d = s.date ? s.date.split('T')[0] : '';
+                  const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                  const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                  const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                  return inRange && empMatch && locMatch;
+                });
+                return matching.length > 10;
+              })()}
+              className={`px-6 py-3 rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl ${
+                !bulkEditFormData.startDate || !bulkEditFormData.endDate || !bulkEditFormData.newShiftTypeId
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : (() => {
+                    const matching = shifts.filter(s => {
+                      const d = s.date ? s.date.split('T')[0] : '';
+                      const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                      const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                      const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                      return inRange && empMatch && locMatch;
+                    });
+                    return matching.length > 10
+                      ? 'bg-red-300 text-red-700 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white';
+                  })()
+              }`}
+            >
+              {(() => {
+                const matching = shifts.filter(s => {
+                  const d = s.date ? s.date.split('T')[0] : '';
+                  const inRange = d >= bulkEditFormData.startDate && d <= bulkEditFormData.endDate;
+                  const empMatch = !bulkEditFormData.employeeId || s.employee?.id === bulkEditFormData.employeeId;
+                  const locMatch = !bulkEditFormData.locationId || s.location?.id === bulkEditFormData.locationId;
+                  return inRange && empMatch && locMatch;
+                });
+                return matching.length > 10 ? '⚠️ Límite excedido (máx 10)' : 'Actualizar Turnos';
+              })()}
             </button>
           </div>
         </form>

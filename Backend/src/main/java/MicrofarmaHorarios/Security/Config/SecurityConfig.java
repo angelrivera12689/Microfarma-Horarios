@@ -23,12 +23,15 @@ import MicrofarmaHorarios.Security.Utils.JwtRequestFilter;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtRequestFilter jwtRequestFilter;
 
-    public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint, JwtRequestFilter jwtRequestFilter) {
+    public SecurityConfig(
+            JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint, 
+            JwtRequestFilter jwtRequestFilter) {
         this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
         this.jwtRequestFilter = jwtRequestFilter;
     }
@@ -41,10 +44,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Arrays.asList("*")); // Allow all origins for development
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        // ✅ MEJORADO: CORS más restrictivo en producción
+        String[] allowedOrigins = System.getenv("ALLOWED_ORIGINS") != null 
+            ? System.getenv("ALLOWED_ORIGINS").split(",")
+            : new String[]{"http://localhost:5173", "http://localhost:3000"}; // Dev defaults
+        configuration.setAllowedOrigins(Arrays.asList(allowedOrigins));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Requested-With"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "X-Rate-Limit-Remaining"));
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
@@ -57,20 +66,33 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .csrf().disable()
+        http
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // ✅ MEJORADO: CSRF habilitado (aunque stateless, es buena práctica)
+            .csrf(csrf -> csrf
+                .ignoringRequestMatchers("/api/**")  // APIs REST no necesitan CSRF
+            )
             .authorizeHttpRequests(authz -> authz
-                .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/health").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/Role").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/User/**").permitAll()
                 .anyRequest().authenticated()
             )
-            .exceptionHandling().authenticationEntryPoint(jwtAuthenticationEntryPoint)
-            .and()
-            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+            )
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            // ✅ MEJORADO: Headers de seguridad
+            .headers(headers -> headers
+                .frameOptions(frameOptions -> frameOptions.deny())
+                .xssProtection()
+            );
 
-       http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
+        // ✅ Agregar filtro JWT
+        http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
-       return http.build();
+        return http.build();
     }
 }
