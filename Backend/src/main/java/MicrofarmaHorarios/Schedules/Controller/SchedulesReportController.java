@@ -766,7 +766,14 @@ public class SchedulesReportController {
             @RequestParam int month,
             @RequestParam int year,
             @RequestParam(required = false) String locationId,
-            @RequestParam(required = false) String employeeId) {
+            @RequestParam(required = false) String employeeId,
+            @RequestParam(required = false) Double baseRate,
+            @RequestParam(required = false) Double regularHours,
+            @RequestParam(required = false) Double diurnaExtraHours,
+            @RequestParam(required = false) Double nocturnaExtraHours,
+            @RequestParam(required = false) Double dominicalHours,
+            @RequestParam(required = false) Double festivoHours,
+            @RequestParam(required = false) Double monthlyHourLimit) {
         try {
             logger.info("Exporting Excel report for month={}, year={}, locationId={}, employeeId={}", 
                     month, year, locationId, employeeId);
@@ -785,7 +792,9 @@ public class SchedulesReportController {
                 filename = "reporte_general_" + year + "_" + month + ".xlsx";
             }
 
-            byte[] excelBytes = excelExportService.generateProfessionalExcelReport(report, month, year);
+            byte[] excelBytes = excelExportService.generateProfessionalExcelReport(report, month, year,
+                    baseRate, regularHours, diurnaExtraHours, nocturnaExtraHours,
+                    dominicalHours, festivoHours, monthlyHourLimit);
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);

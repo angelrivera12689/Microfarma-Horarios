@@ -754,21 +754,35 @@ const Reports = () => {
               <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.festivoHours * 100).toFixed(0)}%</p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Multiplicador Horas Nocturnas
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                value={rateConfig.nocturnaHours}
-                onChange={(e) => handleRateChange('nocturnaHours', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                placeholder="1.35"
-              />
-              <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.nocturnaHours * 100).toFixed(0)}%</p>
-            </div>
-          </div>
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Multiplicador Horas Nocturnas
+               </label>
+               <input
+                 type="number"
+                 step="0.01"
+                 value={rateConfig.nocturnaHours}
+                 onChange={(e) => handleRateChange('nocturnaHours', e.target.value)}
+                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                 placeholder="1.35"
+               />
+               <p className="text-xs text-gray-500 mt-1">Valor: {(rateConfig.nocturnaHours * 100).toFixed(0)}%</p>
+             </div>
+
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-2">
+                 Horas Límite Mensual
+               </label>
+               <input
+                 type="number"
+                 value={rateConfig.monthlyHourLimit}
+                 onChange={(e) => handleRateChange('monthlyHourLimit', e.target.value)}
+                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                 placeholder="220"
+               />
+               <p className="text-xs text-gray-500 mt-1">Horas antes de considerar extras</p>
+             </div>
+           </div>
 
           <div className="flex justify-between pt-4 border-t border-gray-200">
             <button

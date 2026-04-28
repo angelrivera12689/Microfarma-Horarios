@@ -30,15 +30,26 @@ public class ExcelExportService {
     public byte[] generateProfessionalExcelReport(
             ReportResponseDto report,
             int month,
-            int year) throws IOException {
+            int year,
+            Double baseRate,
+            Double regularHours,
+            Double diurnaExtraHours,
+            Double nocturnaExtraHours,
+            Double dominicalHours,
+            Double festivoHours,
+            Double monthlyHourLimit) throws IOException {
+
+        double limiteHoras = (monthlyHourLimit != null) ? monthlyHourLimit : LIMITE_HORAS;
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             createGlobalSheet(workbook, report.getGlobal(), month, year);
             createLocationsSheet(workbook, report.getLocations(), month, year);
-            createEmployeesSheet(workbook, report.getEmployees(), month, year);
-            createAlertsSheet(workbook, report.getEmployees(), month, year);
+            createEmployeesSheet(workbook, report.getEmployees(), month, year,
+                    baseRate, regularHours, diurnaExtraHours, nocturnaExtraHours,
+                    dominicalHours, festivoHours, limiteHoras);
+            createAlertsSheet(workbook, report.getEmployees(), month, year, limiteHoras);
 
             workbook.getCreationHelper()
                     .createFormulaEvaluator()
@@ -171,7 +182,14 @@ public class ExcelExportService {
             Workbook wb,
             List<EmployeeReportDto> list,
             int month,
-            int year) {
+            int year,
+            Double baseRate,
+            Double regularHoursMult,
+            Double diurnaExtraMult,
+            Double nocturnaExtraMult,
+            Double dominicalMult,
+            Double festivoMult,
+            Double limiteHoras) {
 
         Sheet sheet = wb.createSheet("Empleados");
         configSheet(sheet);
@@ -185,16 +203,16 @@ public class ExcelExportService {
 
         Row r0 = sheet.createRow(0);
         createCell(r0, 0, "INFORME DE EMPLEADOS - " + getMonth(month) + " " + year, title);
-        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 11));
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 12));
 
         Row h = sheet.createRow(2);
 
         String[] headers = {
                 "NOMBRE", "DÍAS", "TURNOS",
                 "HORAS", "PROM DÍA", "PROM SEM",
-                "EXTRAS >220", "REGULARES",
+                "EXTRAS >LIM", "REGULARES",
                 "EXTRA D", "EXTRA N",
-                "DOMINICAL", "FESTIVA"
+                "DOMINICAL", "FESTIVA", "TOTAL A PAGAR"
         };
 
         for (int i = 0; i < headers.length; i++) {
@@ -218,8 +236,8 @@ public class ExcelExportService {
             createCell(rw, 5, e.getWeeklyTotalHours(), st);
 
             Cell extra = rw.createCell(6);
-            extra.setCellFormula("MAX(D" + (row + 1) + "-220,0)");
-            extra.setCellStyle(nvl(e.getTotalHours()) > LIMITE_HORAS ? red : st);
+            extra.setCellFormula("MAX(D" + (row + 1) + "-" + limiteHoras + ",0)");
+            extra.setCellStyle(nvl(e.getTotalHours()) > limiteHoras ? red : st);
 
             createCell(rw, 7, e.getRegularHours(), st);
             createCell(rw, 8, e.getDiurnaExtraHours(), st);
@@ -227,10 +245,45 @@ public class ExcelExportService {
             createCell(rw, 10, e.getDominicalHours(), st);
             createCell(rw, 11, e.getFestivoHours(), st);
 
+            // Calculate total to pay
+            double totalToPay = calculateTotalToPay(e, baseRate, regularHoursMult, 
+                    diurnaExtraMult, nocturnaExtraMult, dominicalMult, festivoMult);
+            Cell totalCell = rw.createCell(12);
+            totalCell.setCellValue(totalToPay);
+            totalCell.setCellStyle(createCurrencyStyle(wb));
+
             row++;
         }
 
         applyConditional(sheet, 3, row - 1, 6);
+    }
+
+    // Helper method to calculate total to pay
+    private double calculateTotalToPay(EmployeeReportDto e, Double baseRate, 
+            Double regularMult, Double diurnaExtraMult, Double nocturnaExtraMult,
+            Double dominicalMult, Double festivoMult) {
+        double br = baseRate != null ? baseRate : 5000.0;
+        double reg = regularMult != null ? regularMult : 1.0;
+        double dex = diurnaExtraMult != null ? diurnaExtraMult : 1.35;
+        double nex = nocturnaExtraMult != null ? nocturnaExtraMult : 1.50;
+        double dom = dominicalMult != null ? dominicalMult : 1.75;
+        double fes = festivoMult != null ? festivoMult : 1.75;
+
+        double regularValue = (e.getRegularHours() != null ? e.getRegularHours() : 0) * br * reg;
+        double diurnaExtraValue = (e.getDiurnaExtraHours() != null ? e.getDiurnaExtraHours() : 0) * br * dex;
+        double nocturnaExtraValue = (e.getNocturnaExtraHours() != null ? e.getNocturnaExtraHours() : 0) * br * nex;
+        double dominicalValue = (e.getDominicalHours() != null ? e.getDominicalHours() : 0) * br * dom;
+        double festivoValue = (e.getFestivoHours() != null ? e.getFestivoHours() : 0) * br * fes;
+
+        return regularValue + diurnaExtraValue + nocturnaExtraValue + dominicalValue + festivoValue;
+    }
+
+    // Helper method to create currency style
+    private CellStyle createCurrencyStyle(Workbook wb) {
+        CellStyle s = base(wb);
+        DataFormat format = wb.createDataFormat();
+        s.setDataFormat(format.getFormat("$#,##0.00"));
+        return s;
     }
 
     // =====================================================
@@ -240,7 +293,8 @@ public class ExcelExportService {
             Workbook wb,
             List<EmployeeReportDto> all,
             int month,
-            int year) {
+            int year,
+            double limiteHoras) {
 
         Sheet sheet = wb.createSheet("Alertas");
         configSheet(sheet);
@@ -251,11 +305,11 @@ public class ExcelExportService {
         CellStyle red = redSoftStyle(wb);
 
         List<EmployeeReportDto> list = all.stream()
-                .filter(x -> nvl(x.getTotalHours()) > LIMITE_HORAS)
+                .filter(x -> nvl(x.getTotalHours()) > limiteHoras)
                 .collect(Collectors.toList());
 
         Row r0 = sheet.createRow(0);
-        createCell(r0, 0, "ALERTA EMPLEADOS +220 HORAS", title);
+        createCell(r0, 0, "ALERTA EMPLEADOS +" + (int)limiteHoras + " HORAS", title);
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 6));
 
         Row r1 = sheet.createRow(1);
@@ -284,7 +338,7 @@ public class ExcelExportService {
             createCell(rw, 1, e.getTotalHours(), normal);
 
             Cell c = rw.createCell(2);
-            c.setCellFormula("MAX(B" + (row + 1) + "-220,0)");
+            c.setCellFormula("MAX(B" + (row + 1) + "-" + (int)limiteHoras + ",0)");
             c.setCellStyle(red);
 
             createCell(rw, 3, e.getDailyAvgHours(), normal);

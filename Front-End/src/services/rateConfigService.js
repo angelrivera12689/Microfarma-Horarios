@@ -13,6 +13,9 @@ const DEFAULT_RATES = {
   // Additional rates
   nocturnaHours: 1.35,    // 135% for regular night hours
   
+  // Monthly hour limit for overtime calculation
+  monthlyHourLimit: 220,  // Límite mensual de horas para calcular extras
+  
   // Rate names for display
   rateNames: {
     baseRate: 'Tarifa Base',
@@ -21,7 +24,8 @@ const DEFAULT_RATES = {
     nocturnaExtraHours: 'Horas Extra Nocturnas',
     dominicalHours: 'Horas Dominicales',
     festivoHours: 'Horas Festivas',
-    nocturnaHours: 'Horas Nocturnas'
+    nocturnaHours: 'Horas Nocturnas',
+    monthlyHourLimit: 'Límite Mensual de Horas'
   },
   
   // Rate descriptions
@@ -32,7 +36,8 @@ const DEFAULT_RATES = {
     nocturnaExtraHours: 'Recargo para horas extras nocturnas (50%)',
     dominicalHours: 'Recargo para horas dominicales (75%)',
     festivoHours: 'Recargo para horas festivas (75%)',
-    nocturnaHours: 'Recargo para horas nocturnas regulares (35%)'
+    nocturnaHours: 'Recargo para horas nocturnas regulares (35%)',
+    monthlyHourLimit: 'Horas mensuales antes de calcular extras (límite legal/internal)'
   }
 };
 

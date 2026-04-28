@@ -183,8 +183,16 @@ export const exportShiftsToExcel = (shifts, filename = 'turnos') => {
 export const exportReportToExcel = async (report, selectedMonth, selectedYear, options = {}) => {
   const { locationId, employeeId } = options;
   
-  // Build the backend URL
+  // Build the backend URL with rates and limits
+  const rates = getRates();
   let url = `/api/schedules/reports/export/excel?month=${selectedMonth}&year=${selectedYear}`;
+  url += `&baseRate=${rates.baseRate}`;
+  url += `&regularHours=${rates.regularHours}`;
+  url += `&diurnaExtraHours=${rates.diurnaExtraHours}`;
+  url += `&nocturnaExtraHours=${rates.nocturnaExtraHours}`;
+  url += `&dominicalHours=${rates.dominicalHours}`;
+  url += `&festivoHours=${rates.festivoHours}`;
+  url += `&monthlyHourLimit=${rates.monthlyHourLimit}`;
   if (locationId) {
     url += `&locationId=${locationId}`;
   }
