@@ -193,7 +193,15 @@ const Reports = () => {
         return;
       }
       
-      exportReportToExcel(report, selectedMonth, selectedYear);
+      // Build options based on report type
+      const options = {};
+      if (reportType === 'location' && selectedLocation) {
+        options.locationId = selectedLocation;
+      } else if (reportType === 'employee' && selectedEmployee) {
+        options.employeeId = selectedEmployee;
+      }
+      
+      exportReportToExcel(report, selectedMonth, selectedYear, options);
     }
   );
 

@@ -1,27 +1,15 @@
 package MicrofarmaHorarios.Schedules.Service;
 
-import java.awt.Color;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Month;
+import java.time.format.TextStyle;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
-import org.apache.poi.ss.usermodel.BorderStyle;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.DataValidation;
-import org.apache.poi.ss.usermodel.DataValidationConstraint;
-import org.apache.poi.ss.usermodel.DataValidationHelper;
-import org.apache.poi.ss.usermodel.FillPatternType;
-import org.apache.poi.ss.usermodel.Font;
-import org.apache.poi.ss.usermodel.HorizontalAlignment;
-import org.apache.poi.ss.usermodel.IndexedColors;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.VerticalAlignment;
-import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
@@ -30,764 +18,509 @@ import MicrofarmaHorarios.Schedules.DTO.Response.GlobalReportDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.LocationReportDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 
-/**
- * Servicio para generar informes en Excel con diseño profesional
- * Incluye paletas de colores armoniosas, bordes definidos,
- * encabezados destacados y filas alternadas
- */
 @Service
 public class ExcelExportService {
 
-    // ============================================
-    // PALETA DE COLORES - DROGUERÍA MICROFARMA
-    // ============================================
-    
-    // Colores corporativos Droguería Microfarma - ROJO Y BLANCO
-    private static final Color MICROFARMA_RED = new Color(200, 16, 46);       // Rojo vivo corporativo
-    private static final Color MICROFARMA_RED_DARK = new Color(150, 0, 30);    // Rojo oscuro
-    private static final Color MICROFARMA_WHITE = Color.WHITE;                   // Blanco puro
-    private static final Color MICROFARMA_RED_LIGHT = new Color(255, 240, 240);   // Rojo muy claro (fondo filas impares)
-    private static final Color MICROFARMA_RED_MEDIUM = new Color(255, 200, 200); // Rojo medio claro
-    
-    // Colores neutros
-    private static final Color GRAY_DARK = new Color(64, 64, 64);              // Gris oscuro
-    private static final Color GRAY_MEDIUM = new Color(128, 128, 128);    // Gris medio
-    private static final Color GRAY_LIGHT = new Color(217, 217, 217);   // Gris claro
-    private static final Color GRAY_EXTRALIGHT = new Color(245, 245, 245); // Gris muy claro
-    
-    // Colores para filas alternadas
-    private static final Color ROW_EVEN = Color.WHITE;                 // Blanco para filas pares
-    private static final Color ROW_ODD = new Color(255, 240, 240);      // Rojo muy claro para filas impares
-    
-    // Colores para estados/condiciones
-    private static final Color SUCCESS_GREEN = new Color(34, 139, 34);    // Verde éxito
-    private static final Color WARNING_ORANGE = new Color(255, 140, 0);   // Naranja advertencia
-    private static final Color DANGER_RED = new Color(200, 16, 46);        // Rojo peligro (same as Microfarma Red)
-    
-    // Constante para heures extras base
-    private static final double OVERTIME_THRESHOLD = 220.0;  // Horas extras después de 220
-    
-    // Colores de encabezado
-    private static final Color HEADER_RED = new Color(200, 16, 46);      // Rojo encabezado
-    private static final Color HEADER_RED_DARK = new Color(150, 0, 30);      // Rojo oscuro
-    
-    // ============================================
-    // MÉTODO PRINCIPAL DE EXPORTACIÓN
-    // ============================================
-    
-    /**
-     * Genera un informe completo en Excel con diseño profesional
-     * @param report Datos del informe
-     * @param month Mes del informe
-     * @param year Año del informe
-     * @return Array de bytes del archivo Excel
-     */
-    public byte[] generateProfessionalExcelReport(ReportResponseDto report, int month, int year) throws IOException {
+    private static final double LIMITE_HORAS = 220.0;
+    private static final Locale LOCALE_ES = new Locale("es", "CO");
+
+    // =====================================================
+    // EXPORTAR
+    // =====================================================
+    public byte[] generateProfessionalExcelReport(
+            ReportResponseDto report,
+            int month,
+            int year) throws IOException {
+
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            
-            // Configurar márgenes del libro (aplicar a cada hoja)
-            for (int i = 0; i < workbook.getNumberOfSheets(); i++) {
-                Sheet sheet = workbook.getSheetAt(i);
-                sheet.setMargin(Sheet.LeftMargin, 0.75);
-                sheet.setMargin(Sheet.RightMargin, 0.75);
-                sheet.setMargin(Sheet.TopMargin, 1.0);
-                sheet.setMargin(Sheet.BottomMargin, 1.0);
-            }
-            
-            // Crear hojas del informe
-            createGlobalSummarySheet(workbook, report.getGlobal(), month, year);
+
+            createGlobalSheet(workbook, report.getGlobal(), month, year);
             createLocationsSheet(workbook, report.getLocations(), month, year);
             createEmployeesSheet(workbook, report.getEmployees(), month, year);
-            
+            createAlertsSheet(workbook, report.getEmployees(), month, year);
+
+            workbook.getCreationHelper()
+                    .createFormulaEvaluator()
+                    .evaluateAll();
+
+            autoSizeAllSheets(workbook);
+
             workbook.write(out);
             return out.toByteArray();
         }
     }
-    
-    // ============================================
-    // HOJA 1: RESUMEN GLOBAL
-    // ============================================
-    
-    private void createGlobalSummarySheet(Workbook workbook, GlobalReportDto global, int month, int year) {
-        Sheet sheet = workbook.createSheet("Resumen Global");
-        
-        // Configurar ancho de columnas
-        sheet.setColumnWidth(0, 5000);  // Descripción
-        sheet.setColumnWidth(1, 3000);  // Valor
-        sheet.setColumnWidth(2, 4000);  // Notas
-        
-        // Configurar márgenes
-        sheet.setMargin(Sheet.LeftMargin, 0.75);
-        sheet.setMargin(Sheet.RightMargin, 0.75);
-        sheet.setMargin(Sheet.TopMargin, 1.0);
-        sheet.setMargin(Sheet.BottomMargin, 1.0);
-        
-        // Crear estilos
-        CellStyle titleStyle = createTitleStyle(workbook);
-        CellStyle subtitleStyle = createSubtitleStyle(workbook);
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        CellStyle dataStyleEven = createDataStyle(workbook, ROW_EVEN);
-        CellStyle dataStyleOdd = createDataStyle(workbook, ROW_ODD);
-        CellStyle highlightStyle = createHighlightStyle(workbook);
-        CellStyle percentageStyle = createPercentageStyle(workbook);
-        
-        int rowNum = 0;
-        
-        // Título principal
-        Row titleRow = sheet.createRow(rowNum++);
-        Cell titleCell = titleRow.createCell(0);
-        titleCell.setCellValue("🏥 DROGUERÍA MICROFARMA");
-        titleCell.setCellStyle(titleStyle);
+
+    // =====================================================
+    // RESUMEN
+    // =====================================================
+    private void createGlobalSheet(
+            Workbook wb,
+            GlobalReportDto g,
+            int month,
+            int year) {
+
+        Sheet sheet = wb.createSheet("Resumen");
+        configSheet(sheet);
+
+        CellStyle title = titleStyle(wb);
+        CellStyle sub = subTitleStyle(wb);
+        CellStyle header = headerStyle(wb);
+        CellStyle even = dataStyle(wb, true);
+        CellStyle odd = dataStyle(wb, false);
+
+        int row = 0;
+
+        Row r0 = sheet.createRow(row++);
+        createCell(r0, 0, "DROGUERÍA MICROFARMA", title);
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 2));
-        
-        // Subtítulo informativo
-        Row infoRow = sheet.createRow(rowNum++);
-        Cell infoCell = infoRow.createCell(0);
-        infoCell.setCellValue("Informe de Horas Laboradas");
-        infoCell.setCellStyle(subtitleStyle);
+
+        Row r1 = sheet.createRow(row++);
+        createCell(r1, 0, "Informe General de Horas", sub);
         sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
-        
-        // Subtítulo con período
-        Row subtitleRow = sheet.createRow(rowNum++);
-        Cell subtitleCell = subtitleRow.createCell(0);
-        String monthName = Month.of(month).name();
-        subtitleCell.setCellValue("Período: " + monthName + " " + year);
-        subtitleCell.setCellStyle(subtitleStyle);
-        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 2));
-        
-        rowNum++; // Fila vacía
-        
-        // Sección: Estadísticas Generales
-        Row sectionTitleRow = sheet.createRow(rowNum++);
-        Cell sectionTitleCell = sectionTitleRow.createCell(0);
-        sectionTitleCell.setCellValue("ESTADÍSTICAS GENERALES");
-        sectionTitleCell.setCellStyle(headerStyle);
-        sheet.addMergedRegion(new CellRangeAddress(rowNum - 1, rowNum - 1, 0, 2));
-        
-        // Encabezados de tabla
-        Row headerRow = sheet.createRow(rowNum++);
-        createHeaderCell(headerRow, 0, "MÉTRICA", headerStyle);
-        createHeaderCell(headerRow, 1, "VALOR", headerStyle);
-        createHeaderCell(headerRow, 2, "OBSERVACIONES", headerStyle);
-        
-        // Datos de métricas generales
-        Object[][] globalData = {
-            {"Total Empleados", global.getTotalEmployees(), "Colaboradores activos en el período"},
-            {"Total Turnos", global.getTotalShifts(), "Turnos completados"},
-            {"Horas Totales", global.getTotalHours(), "Horas laboradas acumuladas"},
-            {"Horas Extras", global.getTotalOvertimeHours(), "Horas adicionales trabajadas"},
-            {"Horas Promedio por Empleado", 
-             global.getTotalEmployees() > 0 ? global.getTotalHours() / global.getTotalEmployees() : 0, 
-             "Media de horas por colaborador"}
+
+        Row r2 = sheet.createRow(row++);
+        createCell(r2, 0, getMonth(month) + " " + year, sub);
+        sheet.addMergedRegion(new CellRangeAddress(2, 2, 0, 2));
+
+        row++;
+
+        Row h = sheet.createRow(row++);
+        createCell(h, 0, "MÉTRICA", header);
+        createCell(h, 1, "VALOR", header);
+        createCell(h, 2, "DETALLE", header);
+
+        Object[][] data = {
+                {"Total Empleados", g.getTotalEmployees(), "Personal activo"},
+                {"Total Turnos", g.getTotalShifts(), "Turnos registrados"},
+                {"Horas Totales", g.getTotalHours(), "Horas trabajadas"},
+                {"Horas Extras", g.getTotalOvertimeHours(), "Horas adicionales"},
+                {"Horas Regulares", g.getTotalRegularHours(), "Jornada normal"}
         };
-        
-        for (int i = 0; i < globalData.length; i++) {
-            CellStyle style = (i % 2 == 0) ? dataStyleEven : dataStyleOdd;
-            Row dataRow = sheet.createRow(rowNum++);
-            createDataCell(dataRow, 0, globalData[i][0].toString(), style);
-            createDataCell(dataRow, 1, formatNumber(globalData[i][1]), style);
-            createDataCell(dataRow, 2, globalData[i][2].toString(), style);
+
+        for (int i = 0; i < data.length; i++) {
+
+            Row rw = sheet.createRow(row++);
+            CellStyle st = (i % 2 == 0) ? even : odd;
+
+            createCell(rw, 0, data[i][0].toString(), st);
+            createCell(rw, 1, (Number) data[i][1], st);
+            createCell(rw, 2, data[i][2].toString(), st);
         }
-        
-        rowNum++; // Fila vacía
-        
-        // Sección: Desglose de Horas
-        Row breakdownSectionRow = sheet.createRow(rowNum++);
-        Cell breakdownSectionCell = breakdownSectionRow.createCell(0);
-        breakdownSectionCell.setCellValue("DESGLOSE DE HORAS POR CATEGORÍA");
-        breakdownSectionCell.setCellStyle(headerStyle);
-        sheet.addMergedRegion(new CellRangeAddress(rowNum - 1, rowNum - 1, 0, 2));
-        
-        // Encabezados desglose
-        Row breakdownHeaderRow = sheet.createRow(rowNum++);
-        createHeaderCell(breakdownHeaderRow, 0, "TIPO DE HORAS", headerStyle);
-        createHeaderCell(breakdownHeaderRow, 1, "CANTIDAD", headerStyle);
-        createHeaderCell(breakdownHeaderRow, 2, "PORCENTAJE", headerStyle);
-        
-        // Calcular totales y porcentajes
-        double totalHours = global.getTotalHours() != null ? global.getTotalHours() : 0;
-        
-        Object[][] breakdownData = {
-            {"Horas Regulares", global.getTotalRegularHours(), calculatePercentage(global.getTotalRegularHours(), totalHours)},
-            {"Horas Extras Diurnas", global.getTotalDiurnaExtraHours(), calculatePercentage(global.getTotalDiurnaExtraHours(), totalHours)},
-            {"Horas Extras Nocturnas", global.getTotalNocturnaExtraHours(), calculatePercentage(global.getTotalNocturnaExtraHours(), totalHours)},
-            {"Horas Dominicales", global.getTotalDominicalHours(), calculatePercentage(global.getTotalDominicalHours(), totalHours)},
-            {"Horas Festivas", global.getTotalFestivoHours(), calculatePercentage(global.getTotalFestivoHours(), totalHours)}
-        };
-        
-        for (int i = 0; i < breakdownData.length; i++) {
-            CellStyle style = (i % 2 == 0) ? dataStyleEven : dataStyleOdd;
-            Row dataRow = sheet.createRow(rowNum++);
-            createDataCell(dataRow, 0, breakdownData[i][0].toString(), style);
-            createDataCell(dataRow, 1, formatNumber(breakdownData[i][1]), style);
-            
-            Cell percentCell = dataRow.createCell(2);
-            percentCell.setCellValue((Double) breakdownData[i][2]);
-            percentCell.setCellStyle(percentageStyle);
-        }
-        
-        // Fila de total
-        Row totalRow = sheet.createRow(rowNum++);
-        CellStyle totalStyle = createTotalStyle(workbook);
-        createDataCell(totalRow, 0, "TOTAL", totalStyle);
-        createDataCell(totalRow, 1, formatNumber(totalHours), totalStyle);
-        createDataCell(totalRow, 2, "100%", totalStyle);
-        
-        rowNum++; // Fila vacía
-        
-        // Notas finales
-        Row notesRow = sheet.createRow(rowNum++);
-        Cell notesCell = notesRow.createCell(0);
-        notesCell.setCellValue("Nota: Las horas extras diurnas son aquellas trabajadas entre 6:00 AM y 7:00 PM. Las horas extras nocturnas son las trabajadas entre 7:00 PM y 6:00 AM.");
-        CellStyle notesStyle = workbook.createCellStyle();
-        Font notesFont = workbook.createFont();
-        notesFont.setItalic(true);
-        notesFont.setColor(IndexedColors.GREY_50_PERCENT.getIndex());
-        notesFont.setFontHeightInPoints((short) 9);
-        notesStyle.setFont(notesFont);
-        notesStyle.setAlignment(HorizontalAlignment.LEFT);
-        notesCell.setCellStyle(notesStyle);
-        sheet.addMergedRegion(new CellRangeAddress(rowNum - 1, rowNum - 1, 0, 2));
     }
-    
-    // ============================================
-    // HOJA 2: INFORME POR UBICACIONES
-    // ============================================
-    
-    private void createLocationsSheet(Workbook workbook, List<LocationReportDto> locations, int month, int year) {
-        Sheet sheet = workbook.createSheet("Informe por Ubicaciones");
-        
-        // Configurar anchos de columnas
-        sheet.setColumnWidth(0, 4000);  // Ubicación
-        sheet.setColumnWidth(1, 2500); // Empleados
-        sheet.setColumnWidth(2, 2500); // Turnos
-        sheet.setColumnWidth(3, 3000); // Horas Totales
-        sheet.setColumnWidth(4, 3000); // Horas Extras
-        sheet.setColumnWidth(5, 3000); // Horas Regulares
-        sheet.setColumnWidth(6, 3000); // H. Extra Diurna
-        sheet.setColumnWidth(7, 3000); // H. Extra Nocturna
-        sheet.setColumnWidth(8, 3000); // Dominicales
-        sheet.setColumnWidth(9, 3000); // Festivas
-        
-        // Título
-        Row titleRow = sheet.createRow(0);
-        Cell titleCell = titleRow.createCell(0);
-        titleCell.setCellValue("INFORME DE HORAS POR UBICACIÓN - " + Month.of(month).name() + " " + year);
-        titleCell.setCellStyle(createTitleStyle(workbook));
+
+    // =====================================================
+    // UBICACIONES
+    // =====================================================
+    private void createLocationsSheet(
+            Workbook wb,
+            List<LocationReportDto> list,
+            int month,
+            int year) {
+
+        Sheet sheet = wb.createSheet("Ubicaciones");
+        configSheet(sheet);
+
+        CellStyle title = titleStyle(wb);
+        CellStyle header = headerStyle(wb);
+        CellStyle even = dataStyle(wb, true);
+        CellStyle odd = dataStyle(wb, false);
+
+        Row r0 = sheet.createRow(0);
+        createCell(r0, 0, "HORAS POR UBICACIÓN - " + getMonth(month) + " " + year, title);
         sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 9));
-        
-        // Encabezados de columna
-        Row headerRow = sheet.createRow(2);
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        
+
+        Row h = sheet.createRow(2);
+
         String[] headers = {
-            "UBICACIÓN", "EMPLEADOS", "TURNOS", "HORAS TOTALES", 
-            "HORAS EXTRAS", "HORAS REGULARES", "EXTRA DIURNA", 
-            "EXTRA NOCTURNA", "DOMINICALES", "FESTIVAS"
+                "UBICACIÓN", "EMPLEADOS", "TURNOS", "HORAS",
+                "EXTRAS", "REGULARES", "EXTRA D",
+                "EXTRA N", "DOMINICAL", "FESTIVA"
         };
-        
+
         for (int i = 0; i < headers.length; i++) {
-            createHeaderCell(headerRow, i, headers[i], headerStyle);
+            createCell(h, i, headers[i], header);
         }
-        
-        // Datos de ubicaciones
-        int rowNum = 3;
-        CellStyle styleEven = createDataStyle(workbook, ROW_EVEN);
-        CellStyle styleOdd = createDataStyle(workbook, ROW_ODD);
-        
-        for (int i = 0; i < locations.size(); i++) {
-            LocationReportDto location = locations.get(i);
-            CellStyle style = (rowNum % 2 == 0) ? styleEven : styleOdd;
-            
-            Row dataRow = sheet.createRow(rowNum++);
-            
-            createDataCell(dataRow, 0, location.getLocationName(), style);
-            createDataCell(dataRow, 1, location.getTotalEmployees(), style);
-            createDataCell(dataRow, 2, location.getTotalShifts(), style);
-            createDataCell(dataRow, 3, formatNumber(location.getTotalHours()), style);
-            createDataCell(dataRow, 4, formatNumber(location.getTotalOvertimeHours()), style);
-            createDataCell(dataRow, 5, formatNumber(location.getTotalRegularHours()), style);
-            createDataCell(dataRow, 6, formatNumber(location.getTotalDiurnaExtraHours()), style);
-            createDataCell(dataRow, 7, formatNumber(location.getTotalNocturnaExtraHours()), style);
-            createDataCell(dataRow, 8, formatNumber(location.getTotalDominicalHours()), style);
-            createDataCell(dataRow, 9, formatNumber(location.getTotalFestivoHours()), style);
+
+        int row = 3;
+
+        for (int i = 0; i < list.size(); i++) {
+
+            LocationReportDto x = list.get(i);
+            CellStyle st = (i % 2 == 0) ? even : odd;
+
+            Row rw = sheet.createRow(row++);
+
+            createCell(rw, 0, x.getLocationName(), st);
+            createCell(rw, 1, x.getTotalEmployees(), st);
+            createCell(rw, 2, x.getTotalShifts(), st);
+            createCell(rw, 3, x.getTotalHours(), st);
+            createCell(rw, 4, x.getTotalOvertimeHours(), st);
+            createCell(rw, 5, x.getTotalRegularHours(), st);
+            createCell(rw, 6, x.getTotalDiurnaExtraHours(), st);
+            createCell(rw, 7, x.getTotalNocturnaExtraHours(), st);
+            createCell(rw, 8, x.getTotalDominicalHours(), st);
+            createCell(rw, 9, x.getTotalFestivoHours(), st);
         }
-        
-        // Fila de totales
-        if (!locations.isEmpty()) {
-            Row totalRow = sheet.createRow(rowNum);
-            CellStyle totalStyle = createTotalStyle(workbook);
-            
-            createDataCell(totalRow, 0, "TOTALES", totalStyle);
-            createDataCell(totalRow, 1, locations.stream().mapToInt(LocationReportDto::getTotalEmployees).sum(), totalStyle);
-            createDataCell(totalRow, 2, locations.stream().mapToInt(LocationReportDto::getTotalShifts).sum(), totalStyle);
-            createDataCell(totalRow, 3, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalHours).sum()), totalStyle);
-            createDataCell(totalRow, 4, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalOvertimeHours).sum()), totalStyle);
-            createDataCell(totalRow, 5, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalRegularHours).sum()), totalStyle);
-            createDataCell(totalRow, 6, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalDiurnaExtraHours).sum()), totalStyle);
-            createDataCell(totalRow, 7, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalNocturnaExtraHours).sum()), totalStyle);
-            createDataCell(totalRow, 8, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalDominicalHours).sum()), totalStyle);
-            createDataCell(totalRow, 9, formatNumber(locations.stream().mapToDouble(LocationReportDto::getTotalFestivoHours).sum()), totalStyle);
-        }
-        
-        // Aplicar formato condicional para horas extras excesivas
-        applyConditionalFormatting(sheet, 3, rowNum - 1, 4, 50.0);
     }
-    
-    // ============================================
-    // HOJA 3: INFORME POR EMPLEADOS
-    // ============================================
-    
-    private void createEmployeesSheet(Workbook workbook, List<EmployeeReportDto> employees, int month, int year) {
-        Sheet sheet = workbook.createSheet("Informe por Empleado");
-        
-        // Configurar anchos de columnas
-        sheet.setColumnWidth(0, 3000);  // ID
-        sheet.setColumnWidth(1, 5000);  // Nombre
-        sheet.setColumnWidth(2, 2500); // Días Trab.
-        sheet.setColumnWidth(3, 2500); // Turnos
-        sheet.setColumnWidth(4, 3000); // Horas Totales
-        sheet.setColumnWidth(5, 3000); // Horas/Día
-        sheet.setColumnWidth(6, 3000); // Horas/Semana
-        sheet.setColumnWidth(7, 3000); // Horas Extras
-        sheet.setColumnWidth(8, 3000); // Horas Regulares
-        sheet.setColumnWidth(9, 3000); // Extra Diurna
-        sheet.setColumnWidth(10, 3000); // Extra Nocturna
-        sheet.setColumnWidth(11, 3000); // Dominicales
-        sheet.setColumnWidth(12, 3000); // Festivas
-        
-        // Título
-        Row titleRow = sheet.createRow(0);
-        Cell titleCell = titleRow.createCell(0);
-        titleCell.setCellValue("INFORME INDIVIDUAL DE HORARIOS - " + Month.of(month).name() + " " + year);
-        titleCell.setCellStyle(createTitleStyle(workbook));
-        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 12));
-        
-        // Encabezados
-        Row headerRow = sheet.createRow(2);
-        CellStyle headerStyle = createHeaderStyle(workbook);
-        
+
+    // =====================================================
+    // EMPLEADOS
+    // =====================================================
+    private void createEmployeesSheet(
+            Workbook wb,
+            List<EmployeeReportDto> list,
+            int month,
+            int year) {
+
+        Sheet sheet = wb.createSheet("Empleados");
+        configSheet(sheet);
+        sheet.createFreezePane(0, 3);
+
+        CellStyle title = titleStyle(wb);
+        CellStyle header = headerStyle(wb);
+        CellStyle even = dataStyle(wb, true);
+        CellStyle odd = dataStyle(wb, false);
+        CellStyle red = redSoftStyle(wb);
+
+        Row r0 = sheet.createRow(0);
+        createCell(r0, 0, "INFORME DE EMPLEADOS - " + getMonth(month) + " " + year, title);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 11));
+
+        Row h = sheet.createRow(2);
+
         String[] headers = {
-            "ID EMPLEADO", "NOMBRE COMPLETO", "DÍAS LAB.", "TURNOS", 
-            "HORAS TOTALES", "PROM/DÍA", "PROM/SEMANA", 
-            "EXTRAS (>220H)", "REGULARES", "EXTRA DIURNA", 
-            "EXTRA NOCTURNA", "DOMINICALES", "FESTIVAS"
+                "NOMBRE", "DÍAS", "TURNOS",
+                "HORAS", "PROM DÍA", "PROM SEM",
+                "EXTRAS >220", "REGULARES",
+                "EXTRA D", "EXTRA N",
+                "DOMINICAL", "FESTIVA"
         };
-        
+
         for (int i = 0; i < headers.length; i++) {
-            createHeaderCell(headerRow, i, headers[i], headerStyle);
+            createCell(h, i, headers[i], header);
         }
-        
-        // Datos de empleados
-        int rowNum = 3;
-        CellStyle styleEven = createDataStyle(workbook, ROW_EVEN);
-        CellStyle styleOdd = createDataStyle(workbook, ROW_ODD);
-        CellStyle overtimeWarningStyle = createOvertimeWarningStyle(workbook);
-        
-        for (int i = 0; i < employees.size(); i++) {
-            EmployeeReportDto emp = employees.get(i);
-            CellStyle style = (rowNum % 2 == 0) ? styleEven : styleOdd;
-            
-            Row dataRow = sheet.createRow(rowNum++);
-            
-            createDataCell(dataRow, 0, emp.getEmployeeId(), style);
-            createDataCell(dataRow, 1, emp.getFullName(), style);
-            createDataCell(dataRow, 2, emp.getWorkingDays(), style);
-            createDataCell(dataRow, 3, emp.getTotalShifts(), style);
-            createDataCell(dataRow, 4, formatNumber(emp.getTotalHours()), style);
-            createDataCell(dataRow, 5, formatNumber(emp.getDailyAvgHours()), style);
-            createDataCell(dataRow, 6, formatNumber(emp.getWeeklyTotalHours()), style);
-            
-            // Aplicar estilo de advertencia si hay más de 220 horas totales
-            // Fórmula: =IF(E{fila}>220, E{fila}-220, 0) para calcular horas extras después de 220
-            CellStyle overtimeStyle = emp.getTotalHours() != null && emp.getTotalHours() > OVERTIME_THRESHOLD ? overtimeWarningStyle : style;
-            
-            // Crear celda con fórmula de Excel que calcula horas extras después de 220
-            Cell cell = dataRow.createCell(7);
-            int formulaRow = rowNum; // rowNum tiene el valor correcto de la fila
-            String formula = "=IF(E" + formulaRow + ">220, E" + formulaRow + "-220, 0)";
-            cell.setCellFormula(formula);
-            cell.setCellStyle(overtimeStyle);
-            
-            createDataCell(dataRow, 8, formatNumber(emp.getRegularHours()), style);
-            createDataCell(dataRow, 9, formatNumber(emp.getDiurnaExtraHours()), style);
-            createDataCell(dataRow, 10, formatNumber(emp.getNocturnaExtraHours()), style);
-            createDataCell(dataRow, 11, formatNumber(emp.getDominicalHours()), style);
-            createDataCell(dataRow, 12, formatNumber(emp.getFestivoHours()), style);
+
+        int row = 3;
+
+        for (int i = 0; i < list.size(); i++) {
+
+            EmployeeReportDto e = list.get(i);
+            CellStyle st = (i % 2 == 0) ? even : odd;
+
+            Row rw = sheet.createRow(row);
+
+            createCell(rw, 0, e.getFullName(), st);
+            createCell(rw, 1, e.getWorkingDays(), st);
+            createCell(rw, 2, e.getTotalShifts(), st);
+            createCell(rw, 3, e.getTotalHours(), st);
+            createCell(rw, 4, e.getDailyAvgHours(), st);
+            createCell(rw, 5, e.getWeeklyTotalHours(), st);
+
+            Cell extra = rw.createCell(6);
+            extra.setCellFormula("MAX(D" + (row + 1) + "-220,0)");
+            extra.setCellStyle(nvl(e.getTotalHours()) > LIMITE_HORAS ? red : st);
+
+            createCell(rw, 7, e.getRegularHours(), st);
+            createCell(rw, 8, e.getDiurnaExtraHours(), st);
+            createCell(rw, 9, e.getNocturnaExtraHours(), st);
+            createCell(rw, 10, e.getDominicalHours(), st);
+            createCell(rw, 11, e.getFestivoHours(), st);
+
+            row++;
         }
-        
-        // Fila de totales
-        if (!employees.isEmpty()) {
-            Row totalRow = sheet.createRow(rowNum);
-            CellStyle totalStyle = createTotalStyle(workbook);
-            
-            createDataCell(totalRow, 0, "TOTALES", totalStyle);
-            createDataCell(totalRow, 1, employees.size() + " empleados", totalStyle);
-            createDataCell(totalRow, 2, employees.stream().mapToInt(e -> e.getWorkingDays() != null ? e.getWorkingDays() : 0).sum(), totalStyle);
-            createDataCell(totalRow, 3, employees.stream().mapToInt(e -> e.getTotalShifts() != null ? e.getTotalShifts() : 0).sum(), totalStyle);
-            createDataCell(totalRow, 4, formatNumber(employees.stream().mapToDouble(e -> e.getTotalHours() != null ? e.getTotalHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 5, "-", totalStyle);
-            createDataCell(totalRow, 6, "-", totalStyle);
-            createDataCell(totalRow, 7, formatNumber(employees.stream().mapToDouble(e -> e.getOvertimeHours() != null ? e.getOvertimeHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 8, formatNumber(employees.stream().mapToDouble(e -> e.getRegularHours() != null ? e.getRegularHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 9, formatNumber(employees.stream().mapToDouble(e -> e.getDiurnaExtraHours() != null ? e.getDiurnaExtraHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 10, formatNumber(employees.stream().mapToDouble(e -> e.getNocturnaExtraHours() != null ? e.getNocturnaExtraHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 11, formatNumber(employees.stream().mapToDouble(e -> e.getDominicalHours() != null ? e.getDominicalHours() : 0).sum()), totalStyle);
-            createDataCell(totalRow, 12, formatNumber(employees.stream().mapToDouble(e -> e.getFestivoHours() != null ? e.getFestivoHours() : 0).sum()), totalStyle);
+
+        applyConditional(sheet, 3, row - 1, 6);
+    }
+
+    // =====================================================
+    // ALERTAS
+    // =====================================================
+    private void createAlertsSheet(
+            Workbook wb,
+            List<EmployeeReportDto> all,
+            int month,
+            int year) {
+
+        Sheet sheet = wb.createSheet("Alertas");
+        configSheet(sheet);
+
+        CellStyle title = titleStyle(wb);
+        CellStyle header = grayHeaderStyle(wb);
+        CellStyle normal = dataStyle(wb, true);
+        CellStyle red = redSoftStyle(wb);
+
+        List<EmployeeReportDto> list = all.stream()
+                .filter(x -> nvl(x.getTotalHours()) > LIMITE_HORAS)
+                .collect(Collectors.toList());
+
+        Row r0 = sheet.createRow(0);
+        createCell(r0, 0, "ALERTA EMPLEADOS +220 HORAS", title);
+        sheet.addMergedRegion(new CellRangeAddress(0, 0, 0, 6));
+
+        Row r1 = sheet.createRow(1);
+        createCell(r1, 0, "Total empleados en alerta: " + list.size(), subTitleStyle(wb));
+        sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 6));
+
+        Row h = sheet.createRow(3);
+
+        String[] headers = {
+                "NOMBRE", "HORAS", "EXTRAS",
+                "PROM DÍA", "PROM SEM",
+                "TURNOS", "DÍAS"
+        };
+
+        for (int i = 0; i < headers.length; i++) {
+            createCell(h, i, headers[i], header);
         }
-        
-        // Formato condicional para horas extras > 220
-        applyConditionalFormatting(sheet, 3, rowNum - 1, 7, OVERTIME_THRESHOLD);
-    }
-    
-    // ============================================
-    // MÉTODOS DE ESTILO - TÍTULOS Y ENCABEZADOS
-    // ============================================
-    
-    /**
-     * Crea estilo para títulos principales - Droguería Microfarma
-     */
-    private CellStyle createTitleStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        // Fondo blanco
-        style.setFillForegroundColor(IndexedColors.WHITE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        // Fuente roja corporativa
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 20);
-        font.setColor(IndexedColors.RED.getIndex());
-        font.setFontName("Calibri");
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Borde inferior grueso rojo
-        style.setBorderBottom(BorderStyle.MEDIUM);
-        style.setBottomBorderColor(IndexedColors.RED.getIndex());
-        
-        return style;
-    }
-    
-    /**
-     * Crea estilo para subtítulos
-     */
-    private CellStyle createSubtitleStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 14);
-        font.setColor(IndexedColors.GREY_50_PERCENT.getIndex());
-        font.setFontName("Calibri");
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        
-        return style;
-    }
-    
-    /**
-     * Crea estilo para encabezados de tabla - Droguería Microfarma
-     * Fondo rojo con texto blanco
-     */
-    private CellStyle createHeaderStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        // Fondo rojo corporativo Microfarma
-        style.setFillForegroundColor(IndexedColors.RED.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        // Fuente blanca y negrita
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 11);
-        font.setColor(IndexedColors.WHITE.getIndex());
-        font.setFontName("Calibri");
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes completos
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.DARK_RED.getIndex());
-        style.setBottomBorderColor(IndexedColors.DARK_RED.getIndex());
-        style.setLeftBorderColor(IndexedColors.DARK_RED.getIndex());
-        style.setRightBorderColor(IndexedColors.DARK_RED.getIndex());
-        
-        // Ajuste de texto
-        style.setWrapText(true);
-        
-        return style;
-    }
-    
-    // ============================================
-    // MÉTODOS DE ESTILO - DATOS
-    // ============================================
-    
-    /**
-     * Crea estilo para celdas de datos
-     */
-    private CellStyle createDataStyle(Workbook workbook, Color backgroundColor) {
-        CellStyle style = workbook.createCellStyle();
-        
-        // Fondo con color alternado
-        if (backgroundColor.equals(ROW_EVEN)) {
-            style.setFillForegroundColor(IndexedColors.WHITE.getIndex());
-        } else {
-            style.setFillForegroundColor(IndexedColors.PALE_BLUE.getIndex());
+
+        int row = 4;
+
+        for (EmployeeReportDto e : list) {
+
+            Row rw = sheet.createRow(row);
+
+            createCell(rw, 0, e.getFullName(), normal);
+            createCell(rw, 1, e.getTotalHours(), normal);
+
+            Cell c = rw.createCell(2);
+            c.setCellFormula("MAX(B" + (row + 1) + "-220,0)");
+            c.setCellStyle(red);
+
+            createCell(rw, 3, e.getDailyAvgHours(), normal);
+            createCell(rw, 4, e.getWeeklyTotalHours(), normal);
+            createCell(rw, 5, e.getTotalShifts(), normal);
+            createCell(rw, 6, e.getWorkingDays(), normal);
+
+            row++;
         }
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        // Fuente
-        Font font = workbook.createFont();
-        font.setFontHeightInPoints((short) 10);
-        font.setFontName("Calibri");
-        font.setColor(IndexedColors.BLACK.getIndex());
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.LEFT);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes completos
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
-        style.setBottomBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
-        style.setLeftBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
-        style.setRightBorderColor(IndexedColors.GREY_25_PERCENT.getIndex());
-        
-        return style;
     }
-    
-    /**
-     * Crea estilo para celdas destacadas
-     */
-    private CellStyle createHighlightStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 10);
-        font.setFontName("Calibri");
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes
-        style.setBorderTop(BorderStyle.MEDIUM);
-        style.setBorderBottom(BorderStyle.MEDIUM);
-        style.setBorderLeft(BorderStyle.MEDIUM);
-        style.setBorderRight(BorderStyle.MEDIUM);
-        
-        return style;
+
+    // =====================================================
+    // ESTILOS
+    // =====================================================
+    private CellStyle titleStyle(Workbook wb) {
+
+        CellStyle s = wb.createCellStyle();
+        s.setAlignment(HorizontalAlignment.CENTER);
+        s.setVerticalAlignment(VerticalAlignment.CENTER);
+        s.setWrapText(true);
+
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setFontHeightInPoints((short) 18);
+        f.setColor(IndexedColors.RED.getIndex());
+
+        s.setFont(f);
+        return s;
     }
-    
-    /**
-     * Crea estilo para porcentajes
-     */
-    private CellStyle createPercentageStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        style.setFillForegroundColor(IndexedColors.WHITE.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 10);
-        font.setFontName("Calibri");
-        font.setColor(IndexedColors.DARK_BLUE.getIndex());
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        
-        return style;
+
+    private CellStyle subTitleStyle(Workbook wb) {
+
+        CellStyle s = wb.createCellStyle();
+        s.setAlignment(HorizontalAlignment.CENTER);
+        s.setVerticalAlignment(VerticalAlignment.CENTER);
+        s.setWrapText(true);
+
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setColor(IndexedColors.GREY_50_PERCENT.getIndex());
+
+        s.setFont(f);
+        return s;
     }
-    
-    /**
-     * Crea estilo para fila de totales - Droguería Microfarma
-     * Fondo rojo con texto blanco
-     */
-    private CellStyle createTotalStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        // Fondo rojo corporativo
-        style.setFillForegroundColor(IndexedColors.RED.getIndex());
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        // Fuente blanca y negrita
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 11);
-        font.setFontName("Calibri");
-        font.setColor(IndexedColors.WHITE.getIndex());
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes completos más gruesos
-        style.setBorderTop(BorderStyle.MEDIUM);
-        style.setBorderBottom(BorderStyle.MEDIUM);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.DARK_RED.getIndex());
-        style.setBottomBorderColor(IndexedColors.DARK_RED.getIndex());
-        
-        return style;
+
+    private CellStyle headerStyle(Workbook wb) {
+
+        CellStyle s = base(wb);
+        s.setFillForegroundColor(IndexedColors.CORAL.getIndex());
+        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setColor(IndexedColors.WHITE.getIndex());
+
+        s.setFont(f);
+        return s;
     }
-    
-    /**
-     * Crea estilo para advertencia de horas extras excesivas (>220 horas)
-     * Fondo rojo claro con texto rojo oscuro
-     */
-    private CellStyle createOvertimeWarningStyle(Workbook workbook) {
-        CellStyle style = workbook.createCellStyle();
-        
-        // Fondo rojo muy claro (rosa)
-        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex()); // Using light blue as substitute for light pink
-        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-        
-        // Fuente roja corporativa
-        Font font = workbook.createFont();
-        font.setBold(true);
-        font.setFontHeightInPoints((short) 10);
-        font.setFontName("Calibri");
-        font.setColor(IndexedColors.RED.getIndex());
-        
-        style.setFont(font);
-        style.setAlignment(HorizontalAlignment.CENTER);
-        style.setVerticalAlignment(VerticalAlignment.CENTER);
-        
-        // Bordes rojos
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
-        style.setTopBorderColor(IndexedColors.RED.getIndex());
-        style.setBottomBorderColor(IndexedColors.RED.getIndex());
-        
-        return style;
+
+    private CellStyle grayHeaderStyle(Workbook wb) {
+
+        CellStyle s = base(wb);
+        s.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setColor(IndexedColors.BLACK.getIndex());
+
+        s.setFont(f);
+        return s;
     }
-    
-    // ============================================
-    // MÉTODOS AUXILIARES
-    // ============================================
-    
-    /**
-     * Crea una celda de encabezado
-     */
-    private void createHeaderCell(Row row, int column, String value, CellStyle style) {
-        Cell cell = row.createCell(column);
-        cell.setCellValue(value);
-        cell.setCellStyle(style);
+
+    private CellStyle dataStyle(Workbook wb, boolean even) {
+
+        CellStyle s = base(wb);
+
+        s.setFillForegroundColor(
+                even ? IndexedColors.WHITE.getIndex()
+                     : IndexedColors.GREY_25_PERCENT.getIndex()
+        );
+
+        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+        return s;
     }
-    
-    /**
-     * Crea una celda de datos con valor numérico
-     */
-    private void createDataCell(Row row, int column, Number value, CellStyle style) {
-        Cell cell = row.createCell(column);
-        if (value instanceof Double) {
-            cell.setCellValue((Double) value);
-        } else if (value instanceof Integer) {
-            cell.setCellValue((Integer) value);
-        } else if (value != null) {
-            cell.setCellValue(value.toString());
-        } else {
-            cell.setCellValue("");
-        }
-        cell.setCellStyle(style);
+
+    private CellStyle redSoftStyle(Workbook wb) {
+
+        CellStyle s = base(wb);
+
+        s.setFillForegroundColor(IndexedColors.CORAL.getIndex());
+        s.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        Font f = wb.createFont();
+        f.setBold(true);
+        f.setColor(IndexedColors.BLACK.getIndex());
+
+        s.setFont(f);
+        return s;
     }
-    
-    /**
-     * Crea una celda de datos con valor de texto
-     */
-    private void createDataCell(Row row, int column, String value, CellStyle style) {
-        Cell cell = row.createCell(column);
-        cell.setCellValue(value != null ? value : "");
-        cell.setCellStyle(style);
+
+    private CellStyle base(Workbook wb) {
+
+        CellStyle s = wb.createCellStyle();
+
+        s.setBorderTop(BorderStyle.THIN);
+        s.setBorderBottom(BorderStyle.THIN);
+        s.setBorderLeft(BorderStyle.THIN);
+        s.setBorderRight(BorderStyle.THIN);
+
+        s.setAlignment(HorizontalAlignment.CENTER);
+        s.setVerticalAlignment(VerticalAlignment.CENTER);
+        s.setWrapText(true);
+
+        Font f = wb.createFont();
+        f.setFontHeightInPoints((short) 10);
+        s.setFont(f);
+
+        return s;
     }
-    
-    /**
-     * Formatea un número para mostrar
-     */
-    private String formatNumber(Object value) {
-        if (value == null) {
-            return "0.00";
-        }
-        if (value instanceof Number) {
-            Number number = (Number) value;
-            if (number instanceof Double || number instanceof Float) {
-                return String.format("%.2f", number.doubleValue());
+
+    // =====================================================
+    // FORMATO CONDICIONAL
+    // =====================================================
+    private void applyConditional(
+            Sheet sheet,
+            int start,
+            int end,
+            int col) {
+
+        SheetConditionalFormatting scf =
+                sheet.getSheetConditionalFormatting();
+
+        ConditionalFormattingRule rule =
+                scf.createConditionalFormattingRule(
+                        ComparisonOperator.GT, "0");
+
+        PatternFormatting fill =
+                rule.createPatternFormatting();
+
+        fill.setFillForegroundColor(
+                IndexedColors.CORAL.getIndex());
+
+        fill.setFillPattern(
+                PatternFormatting.SOLID_FOREGROUND);
+
+        CellRangeAddress[] range = {
+                new CellRangeAddress(start, end, col, col)
+        };
+
+        scf.addConditionalFormatting(range, rule);
+    }
+
+    // =====================================================
+    // AUTO AJUSTE PERFECTO
+    // =====================================================
+    private void autoSizeAllSheets(Workbook wb) {
+
+        for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+
+            Sheet sheet = wb.getSheetAt(i);
+            int maxCol = getMaxColumns(sheet);
+
+            for (int col = 0; col < maxCol; col++) {
+                sheet.autoSizeColumn(col);
+
+                int width = sheet.getColumnWidth(col);
+
+                width += 1200; // espacio extra
+                if (width > 15000) width = 15000;
+                if (width < 3500) width = 3500;
+
+                sheet.setColumnWidth(col, width);
             }
-            return number.toString();
         }
-        return value.toString();
     }
-    
-    /**
-     * Calcula el porcentaje de un valor respecto al total
-     */
-    private Double calculatePercentage(Number value, double total) {
-        if (value == null || total == 0) {
-            return 0.0;
+
+    private int getMaxColumns(Sheet sheet) {
+
+        int max = 0;
+
+        for (Row row : sheet) {
+            if (row.getLastCellNum() > max) {
+                max = row.getLastCellNum();
+            }
         }
-        return (value.doubleValue() / total) * 100;
+
+        return max;
     }
-    
-    /**
-     * Aplica formato condicional a una columna
-     * Resalta celdas que superen un umbral específico
-     */
-    private void applyConditionalFormatting(Sheet sheet, int startRow, int endRow, int column, double threshold) {
-        DataValidationHelper validationHelper = sheet.getDataValidationHelper();
-        
-        // Crear validación de datos usando fórmula personalizada
-        CellRangeAddressList cellRangeList = new CellRangeAddressList(startRow, endRow, column, column);
-        
-        // Usar createFormulaConstraint con fórmula personalizada (un solo argumento)
-        // La fórmula es relativa a la primera celda del rango
-        String formula = getExcelColumnLetter(column) + "1>" + threshold;
-        DataValidationConstraint constraint = validationHelper.createCustomConstraint(formula);
-        
-        DataValidation validation = validationHelper.createValidation(constraint, cellRangeList);
-        validation.setShowErrorBox(true);
-        validation.setErrorStyle(DataValidation.ErrorStyle.STOP);
-        
-        sheet.addValidationData(validation);
+
+    // =====================================================
+    // HELPERS
+    // =====================================================
+    private void configSheet(Sheet s) {
+
+        s.setMargin(Sheet.LeftMargin, 0.5);
+        s.setMargin(Sheet.RightMargin, 0.5);
+        s.setMargin(Sheet.TopMargin, 0.75);
+        s.setMargin(Sheet.BottomMargin, 0.75);
+
+        s.setDefaultRowHeightInPoints(24);
     }
-    
-    /**
-     * Convierte número de columna a letra de Excel (0=A, 1=B, ..., 26=AA, etc.)
-     */
-    private String getExcelColumnLetter(int column) {
-        StringBuilder sb = new StringBuilder();
-        while (column >= 0) {
-            sb.insert(0, (char) ('A' + (column % 26)));
-            column = column / 26 - 1;
-        }
-        return sb.toString();
+
+    private void createCell(Row row, int col, String val, CellStyle st) {
+
+        Cell c = row.createCell(col);
+        c.setCellValue(val == null ? "" : val);
+        c.setCellStyle(st);
+    }
+
+    private void createCell(Row row, int col, Number val, CellStyle st) {
+
+        Cell c = row.createCell(col);
+
+        double numero = val == null ? 0 : val.doubleValue();
+        c.setCellValue(numero);
+
+        Workbook wb = row.getSheet().getWorkbook();
+
+        DataFormat format = wb.createDataFormat();
+
+        CellStyle nuevo = wb.createCellStyle();
+        nuevo.cloneStyleFrom(st);
+        nuevo.setDataFormat(format.getFormat("0.00"));
+
+        c.setCellStyle(nuevo);
+    }
+
+    private double nvl(Number n) {
+        return n == null ? 0 : n.doubleValue();
+    }
+
+    private String getMonth(int m) {
+
+        return Month.of(m)
+                .getDisplayName(TextStyle.FULL, LOCALE_ES)
+                .toUpperCase();
     }
 }

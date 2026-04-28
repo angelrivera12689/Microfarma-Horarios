@@ -110,7 +110,9 @@ const DeliveryReports = () => {
 
   const exportToExcel = () => {
     if (report) {
-      exportReportToExcel(report, selectedMonth, selectedYear);
+      // Delivery reports use frontend filtering, so we export general report
+      // In the future, backend could support zone filtering
+      exportReportToExcel(report, selectedMonth, selectedYear, {});
     }
   };
   
