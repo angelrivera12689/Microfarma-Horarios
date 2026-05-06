@@ -45,7 +45,9 @@ import MicrofarmaHorarios.Schedules.DTO.Response.LocationReportDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.OvertimeDetailDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportFiltersDto;
 import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
+import MicrofarmaHorarios.Schedules.Entity.Shift;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesReportService;
+import MicrofarmaHorarios.Schedules.IService.ISchedulesShiftService;
 import MicrofarmaHorarios.Schedules.Service.ExcelExportService;
 import MicrofarmaHorarios.Security.DTO.Response.ApiResponseDto;
 
@@ -66,6 +68,9 @@ public class SchedulesReportController {
 
     @Autowired
     private ExcelExportService excelExportService;
+
+    @Autowired
+    private ISchedulesShiftService shiftService;
 
     // ==================== FILTER ENDPOINTS ====================
 
@@ -809,6 +814,65 @@ public class SchedulesReportController {
             logger.error("Error generating Excel report: ", e);
             return ResponseEntity.internalServerError()
                     .body(("Error al generar informe Excel: " + e.getMessage()).getBytes());
+        }
+    }
+
+    // ==================== SHIFTS EXPORT ENDPOINT ====================
+
+    /**
+     * Exporta el listado de turnos a Excel con formato profesional
+     * Reemplaza la generación en frontend (exportShiftsToExcel)
+     */
+    @GetMapping("/shifts/export/excel")
+    public ResponseEntity<byte[]> exportShiftsToExcel(
+            @RequestParam int month,
+            @RequestParam int year,
+            @RequestParam(required = false) String locationId,
+            @RequestParam(required = false) String employeeId) {
+        try {
+            logger.info("Exporting Shifts List Excel for month={}, year={}, locationId={}, employeeId={}",
+                    month, year, locationId, employeeId);
+
+            // Calculate date range for the month
+            LocalDate startDate = LocalDate.of(year, month, 1);
+            LocalDate endDate = startDate.plusMonths(1).minusDays(1);
+
+            // Fetch shifts by date range
+            List<Shift> shifts = shiftService.findByDateBetween(startDate, endDate);
+
+            // Filter by location if provided
+            if (locationId != null && !locationId.isEmpty()) {
+                shifts = shifts.stream()
+                        .filter(s -> s.getLocation() != null && locationId.equals(s.getLocation().getId()))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+
+            // Filter by employee if provided
+            if (employeeId != null && !employeeId.isEmpty()) {
+                shifts = shifts.stream()
+                        .filter(s -> s.getEmployee() != null && employeeId.equals(s.getEmployee().getId()))
+                        .collect(java.util.stream.Collectors.toList());
+            }
+
+            // Generate Excel
+            byte[] excelBytes = excelExportService.generateShiftsListExcel(shifts, month, year);
+
+            // Filename
+            String filename = "turnos_" + year + "_" + String.format("%02d", month) + ".xlsx";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            headers.setContentDispositionFormData("attachment", filename);
+            headers.setContentLength(excelBytes.length);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(excelBytes);
+
+        } catch (Exception e) {
+            logger.error("Error generating Shifts List Excel: ", e);
+            return ResponseEntity.internalServerError()
+                    .body(("Error al generar listado de turnos: " + e.getMessage()).getBytes());
         }
     }
 }

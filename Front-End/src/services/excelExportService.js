@@ -252,7 +252,60 @@ export const exportReportToExcel = async (report, selectedMonth, selectedYear, o
   }
 };
 
+/**
+ * Exporta el listado de turnos a Excel llamando al backend
+ */
+export const exportShiftsListToExcel = async (month, year, locationId = null, employeeId = null) => {
+  try {
+    const token = localStorage.getItem('token');
+    let url = `/api/schedules/reports/shifts/export/excel?month=${month}&year=${year}`;
+    
+    if (locationId) {
+      url += `&locationId=${locationId}`;
+    }
+    if (employeeId) {
+      url += `&employeeId=${employeeId}`;
+    }
+    
+    const headers = {
+      'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+      headers: headers
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error ${response.status}: ${errorText}`);
+    }
+    
+    const blob = await response.blob();
+    const filename = `turnos_${year}_${String(month).padStart(2, '0')}.xlsx`;
+    
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(downloadUrl);
+    
+  } catch (error) {
+    console.error('Error exporting Shifts List Excel:', error);
+    alert('Error al generar el listado de turnos: ' + error.message);
+  }
+};
+
 export default {
   exportShiftsToExcel,
-  exportReportToExcel
+  exportReportToExcel,
+  exportShiftsListToExcel
 };

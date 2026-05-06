@@ -5,7 +5,7 @@ import shiftService from '../../services/shiftService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
-import { exportShiftsToExcel } from '../../services/excelExportService';
+import { exportShiftsListToExcel } from '../../services/excelExportService';
 
 const Shifts = () => {
   const [shifts, setShifts] = useState([]);
@@ -541,8 +541,7 @@ const Shifts = () => {
   const calendarShifts = getFilteredCalendarShifts();
 
   const exportToExcel = () => {
-    const dataToExport = viewMode === 'calendar' ? shifts : tableShifts;
-    exportShiftsToExcel(dataToExport, 'turnos');
+    exportShiftsListToExcel(currentMonth + 1, currentYear);
   };
 
 

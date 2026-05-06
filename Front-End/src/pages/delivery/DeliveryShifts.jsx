@@ -5,7 +5,7 @@ import shiftService from '../../services/shiftService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
 import shiftTypeService from '../../services/shiftTypeService';
-import { exportShiftsToExcel } from '../../services/excelExportService';
+import { exportShiftsListToExcel } from '../../services/excelExportService';
 // import { exportShiftsToPDF } from '../../services/pdfExportService'; // Ahora usamos el backend
 
 const DeliveryShifts = () => {
@@ -378,8 +378,7 @@ const DeliveryShifts = () => {
   ];
 
   const exportToExcel = () => {
-    const dataToExport = viewMode === 'calendar' ? shifts : shifts;
-    exportShiftsToExcel(dataToExport, 'turnos_domiciliarios');
+    exportShiftsListToExcel(currentMonth + 1, currentYear);
   };
 
   const renderCalendar = () => {
