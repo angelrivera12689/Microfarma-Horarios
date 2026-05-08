@@ -92,6 +92,7 @@ const DataTable = ({
         </div>
 
         {/* Search */}
+        {searchPlaceholder && (
         <div className="mt-4">
           <div className="relative">
             <input
@@ -109,6 +110,7 @@ const DataTable = ({
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Table */}

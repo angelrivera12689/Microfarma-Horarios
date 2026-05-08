@@ -35,6 +35,18 @@ class EmployeeService {
     const response = await apiClient.delete(`/api/humanresources/employees/${id}`);
     return response;
   }
+
+  /**
+   * Busca empleados por término de búsqueda
+   * @param {string} searchTerm - Término a buscar
+   * @returns {Promise<Array>} Lista de empleados encontrados
+   */
+  async searchEmployees(searchTerm) {
+    const response = await apiClient.get('/api/humanresources/employees/search', {
+      params: { q: searchTerm }
+    });
+    return response;
+  }
 }
 
 const employeeService = new EmployeeService();

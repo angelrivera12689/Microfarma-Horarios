@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
+import AutocompleteInput from '../../components/AutocompleteInput';
 import shiftService from '../../services/shiftService';
 import employeeService from '../../services/employeeService';
 import locationService from '../../services/locationService';
@@ -33,7 +34,7 @@ const Shifts = () => {
   const [calendarFilterLocation, setCalendarFilterLocation] = useState('');
   const [calendarFilterEmployee, setCalendarFilterEmployee] = useState('');
   const [calendarFilterShiftType, setCalendarFilterShiftType] = useState('');
-  
+
   // Estado para mostrar advertencia de turno existente
   const [existingShiftWarning, setExistingShiftWarning] = useState(null);
   const [checkingShift, setCheckingShift] = useState(false);
@@ -296,6 +297,14 @@ const Shifts = () => {
     } else {
       setExistingShiftWarning(null);
     }
+  };
+
+  // Función para obtener el texto a mostrar en el autocomplete
+  const getEmployeeDisplayText = (employee) => {
+    if (!employee) return '';
+    const firstName = employee.firstName || '';
+    const lastName = employee.lastName || '';
+    return `${firstName} ${lastName}`.trim() || employee.email || employee.id;
   };
 
   const handleAdd = () => {
@@ -966,20 +975,18 @@ const Shifts = () => {
               <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-2">
                 Empleado
               </label>
-              <select
+              <AutocompleteInput
                 id="employeeId"
+                placeholder="Buscar empleado por nombre, apellido, email o ID..."
                 value={formData.employeeId}
-                onChange={(e) => handleEmployeeChange(e.target.value)}
+                onChange={handleEmployeeChange}
+                options={employees}
+                searchFields={['firstName', 'lastName', 'email', 'id']}
+                displayField={getEmployeeDisplayText}
+                idField="id"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
-              >
-                <option value="">Seleccionar empleado</option>
-                {employees.map(employee => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.firstName} {employee.lastName}
-                  </option>
-                ))}
-              </select>
+                className="w-full"
+              />
             </div>
             <div>
               <label htmlFor="locationId" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1115,20 +1122,18 @@ const Shifts = () => {
               <label htmlFor="bulkEmployeeId" className="block text-sm font-medium text-gray-700 mb-2">
                 Empleado *
               </label>
-              <select
+              <AutocompleteInput
                 id="bulkEmployeeId"
+                placeholder="Buscar empleado..."
                 value={bulkFormData.employeeId}
-                onChange={(e) => setBulkFormData({...bulkFormData, employeeId: e.target.value})}
+                onChange={(value) => setBulkFormData({...bulkFormData, employeeId: value})}
+                options={employees}
+                searchFields={['firstName', 'lastName', 'email', 'id']}
+                displayField={getEmployeeDisplayText}
+                idField="id"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors duration-200"
-              >
-                <option value="">Seleccionar empleado</option>
-                {employees.map(employee => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.firstName} {employee.lastName}
-                  </option>
-                ))}
-              </select>
+                className="w-full"
+              />
             </div>
             <div>
               <label htmlFor="bulkLocationId" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1275,19 +1280,17 @@ const Shifts = () => {
               <label htmlFor="bulkEditEmployee" className="block text-sm font-medium text-gray-700 mb-2">
                 Empleado (opcional - dejar vacío para todos)
               </label>
-              <select
+              <AutocompleteInput
                 id="bulkEditEmployee"
+                placeholder="Buscar empleado (opcional)..."
                 value={bulkEditFormData.employeeId}
-                onChange={(e) => setBulkEditFormData({...bulkEditFormData, employeeId: e.target.value})}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-              >
-                <option value="">Todos los empleados</option>
-                {employees.map(employee => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.firstName} {employee.lastName}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => setBulkEditFormData({...bulkEditFormData, employeeId: value})}
+                options={employees}
+                searchFields={['firstName', 'lastName', 'email', 'id']}
+                displayField={getEmployeeDisplayText}
+                idField="id"
+                className="w-full"
+              />
             </div>
             <div>
               <label htmlFor="bulkEditLocation" className="block text-sm font-medium text-gray-700 mb-2">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DataTable from '../../components/DataTable';
 import Modal from '../../components/Modal';
+import AutocompleteInput from '../../components/AutocompleteInput';
 import employeeService from '../../services/employeeService';
 import positionService from '../../services/positionService';
 import contractTypeService from '../../services/contractTypeService';
@@ -24,14 +25,8 @@ const Employees = () => {
     contractTypeId: ''
   });
   
-  // Filtros
-  const [filterPosition, setFilterPosition] = useState('');
-  const [filterContractType, setFilterContractType] = useState('');
-  const [filterYear, setFilterYear] = useState('');
-  
-  // Generar años para el filtro (desde 2020 hasta el año actual)
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 2019 }, (_, i) => currentYear - i);
+  // Búsqueda de empleados para AutocompleteInput
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
 
   useEffect(() => {
     loadEmployees();
@@ -74,6 +69,14 @@ const Employees = () => {
     } catch {
       // Silently handle error
     }
+  };
+
+  // Función para obtener el texto a mostrar en el autocomplete
+  const getEmployeeDisplayText = (employee) => {
+    if (!employee) return '';
+    const firstName = employee.firstName || '';
+    const lastName = employee.lastName || '';
+    return `${firstName} ${lastName}`.trim() || employee.email || employee.id;
   };
 
   const handleAdd = () => {
@@ -187,24 +190,8 @@ const Employees = () => {
 
   // Obtener empleados filtrados
   const getFilteredEmployees = () => {
-    return employees.filter(emp => {
-      // Filtro por posición - comparar por nombre
-      if (filterPosition && emp.position?.name !== filterPosition) {
-        return false;
-      }
-      // Filtro por tipo de contrato - comparar por nombre
-      if (filterContractType && emp.contractType?.name !== filterContractType) {
-        return false;
-      }
-      // Filtro por año de contratación
-      if (filterYear) {
-        const hireYear = emp.hireDate ? new Date(emp.hireDate).getFullYear() : null;
-        if (String(hireYear) !== filterYear) {
-          return false;
-        }
-      }
-      return true;
-    });
+    if (!selectedEmployeeId) return employees;
+    return employees.filter(emp => emp.id === selectedEmployeeId);
   };
 
   return (
@@ -231,57 +218,18 @@ const Employees = () => {
           </div>
         </div>
 
-        {/* Filtros Organizados */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-          {/* Filtro por Posición */}
-          <select
-            value={filterPosition}
-            onChange={(e) => setFilterPosition(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-          >
-            <option value="">Todas las posiciones</option>
-            {positions.map(pos => (
-              <option key={pos.id} value={pos.name}>{pos.name}</option>
-            ))}
-          </select>
-
-          {/* Filtro por Tipo de Contrato */}
-          <select
-            value={filterContractType}
-            onChange={(e) => setFilterContractType(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-          >
-            <option value="">Todos los contratos</option>
-            {contractTypes.map(ct => (
-              <option key={ct.id} value={ct.name}>{ct.name}</option>
-            ))}
-          </select>
-
-          {/* Filtro por Fecha de Contratación (Año) */}
-          <select
-            value={filterYear}
-            onChange={(e) => setFilterYear(e.target.value)}
-            className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors duration-200"
-          >
-            <option value="">Todos los años</option>
-            {years.map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-
-          {/* Botón para limpiar filtros */}
-          {(filterPosition || filterContractType || filterYear) && (
-            <button
-              onClick={() => {
-                setFilterPosition('');
-                setFilterContractType('');
-                setFilterYear('');
-              }}
-              className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 font-medium"
-            >
-              Limpiar Filtros
-            </button>
-          )}
+        {/* Filtro de búsqueda */}
+        <div className="mb-4">
+          <AutocompleteInput
+            placeholder="Buscar por nombre, apellido, email o ID..."
+            value={selectedEmployeeId}
+            onChange={(value) => setSelectedEmployeeId(value)}
+            options={employees}
+            searchFields={['firstName', 'lastName', 'email', 'id']}
+            displayField={getEmployeeDisplayText}
+            idField="id"
+            className="w-full"
+          />
         </div>
 
         <DataTable
@@ -294,7 +242,6 @@ const Employees = () => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           addButtonText="Agregar Empleado"
-          searchPlaceholder="Buscar empleados..."
           emptyMessage="No hay empleados registrados en el sistema"
           searchFields={null}
         />

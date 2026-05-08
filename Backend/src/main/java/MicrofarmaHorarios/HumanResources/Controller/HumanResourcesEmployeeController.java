@@ -1,5 +1,6 @@
 package MicrofarmaHorarios.HumanResources.Controller;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
@@ -40,6 +42,17 @@ public class HumanResourcesEmployeeController extends AHumanResourcesBaseControl
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body(new ApiResponseDto<Optional<Employee>>(e.getMessage(), null, false));
+        }
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponseDto<List<Employee>>> searchByTerm(@RequestParam String q) {
+        try {
+            List<Employee> employees = employeeService.searchByTerm(q);
+            return ResponseEntity.ok(new ApiResponseDto<List<Employee>>("Búsqueda completada", employees, true));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponseDto<List<Employee>>(e.getMessage(), null, false));
         }
     }
 

@@ -51,6 +51,14 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
     }
 
     @Override
+    public List<Employee> searchByTerm(String searchTerm) throws Exception {
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            return super.findByStateTrue();
+        }
+        return employeeRepository.searchByTerm(searchTerm.trim());
+    }
+
+    @Override
     public Employee save(Employee entity) throws Exception {
         Employee savedEmployee = super.save(entity);
 
