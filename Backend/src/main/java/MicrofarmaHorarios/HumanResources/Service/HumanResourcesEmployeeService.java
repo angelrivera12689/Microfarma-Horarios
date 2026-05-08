@@ -1,11 +1,14 @@
 package MicrofarmaHorarios.HumanResources.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesBaseRepository;
@@ -108,4 +111,28 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
         return savedEmployee;
     }
 
+    @Override
+    @Transactional
+    public void delete(String id) throws Exception {
+        Optional<Employee> op = employeeRepository.findById(id);
+
+        if (op.isEmpty()) {
+            throw new Exception("Registro no encontrado");
+        }
+
+        Employee employee = op.get();
+
+        // Desactivar el usuario asociado si existe
+        if (employee.getUser() != null) {
+            User user = employee.getUser();
+            user.setActive(false);
+            user.setStatus(false);
+            user.setDeletedAt(LocalDateTime.now());
+            user.setDeletedBy(UUID.randomUUID().toString());
+            userService.save(user);
+        }
+
+        // Eliminar el empleado (borrado lógico)
+        super.delete(id);
+    }
 }
