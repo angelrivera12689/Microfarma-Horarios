@@ -12,7 +12,9 @@ import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesBaseReposito
 import MicrofarmaHorarios.HumanResources.IRepository.IHumanResourcesEmployeeRepository;
 import MicrofarmaHorarios.HumanResources.IService.IHumanResourcesEmployeeService;
 import MicrofarmaHorarios.Notification.Service.EmailService;
+import MicrofarmaHorarios.Security.IService.ISecurityRoleService;
 import MicrofarmaHorarios.Security.IService.ISecurityUserService;
+import MicrofarmaHorarios.Security.Entity.Role;
 import MicrofarmaHorarios.Security.Entity.User;
 
 @Service
@@ -28,6 +30,9 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
     @Lazy
     private ISecurityUserService userService;
 
+    @Autowired
+    private ISecurityRoleService roleService;
+
     @Override
     protected IHumanResourcesBaseRepository<Employee, String> getRepository() {
         return employeeRepository;
@@ -36,7 +41,7 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
     @Override
     public List<Employee> findByStateTrue() throws Exception {
         return super.findByStateTrue().stream()
-                .filter(employee -> employee.getUser() != null && "EMPLOYEE".equals(employee.getUser().getRole().getName()))
+                .filter(employee -> employee.getUser() == null || "EMPLOYEE".equals(employee.getUser().getRole().getName()))
                 .toList();
     }
 
@@ -49,18 +54,42 @@ public class HumanResourcesEmployeeService extends AHumanResourcesBaseService<Em
     public Employee save(Employee entity) throws Exception {
         Employee savedEmployee = super.save(entity);
 
-        // Associate with existing User if email matches
+        // Associate with existing User if email matches, or create new User if none exists
         try {
             Optional<User> existingUser = userService.findByEmail(savedEmployee.getEmail());
+            User userToAssociate;
             if (existingUser.isPresent() && existingUser.get().getEmployee() == null) {
-                User user = existingUser.get();
-                user.setEmployee(savedEmployee);
-                savedEmployee.setUser(user);
-                userService.save(user); // Update User
-                employeeRepository.save(savedEmployee); // Update Employee
+                // Use existing user without employee association
+                userToAssociate = existingUser.get();
+            } else {
+                // Create new User with EMPLOYEE role
+                userToAssociate = new User();
+                userToAssociate.setEmail(savedEmployee.getEmail());
+                userToAssociate.setName(savedEmployee.getFirstName() + " " + savedEmployee.getLastName());
+                userToAssociate.setActive(true);
+                // Set default password (should be changed by user)
+                userToAssociate.setPasswordHash("$2a$10$defaulthashedpasswordchangeme");
+                
+                // Find EMPLOYEE role
+                Optional<Role> employeeRole = roleService.findByName("EMPLOYEE");
+                if (employeeRole.isPresent()) {
+                    userToAssociate.setRole(employeeRole.get());
+                } else {
+                    throw new Exception("EMPLOYEE role not found");
+                }
+                
+                // Save the new user
+                userToAssociate = userService.save(userToAssociate);
             }
+            
+            // Associate user with employee
+            userToAssociate.setEmployee(savedEmployee);
+            savedEmployee.setUser(userToAssociate);
+            userService.save(userToAssociate); // Update User
+            employeeRepository.save(savedEmployee); // Update Employee
         } catch (Exception e) {
             // Log but don't fail
+            throw new Exception("Error creating/associating user: " + e.getMessage());
         }
 
         try {

@@ -79,30 +79,35 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
         if (entity.getEmployee() != null && entity.getDate() != null) {
             List<Shift> existingShifts = shiftRepository.findByEmployeeId(entity.getEmployee().getId());
             List<Shift> shiftsForDate = existingShifts.stream()
-                .filter(s -> s.getDate() != null && s.getDate().equals(entity.getDate()))
-                .toList();
+                    .filter(s -> s.getDate() != null && s.getDate().equals(entity.getDate()))
+                    .toList();
 
-            if (!shiftsForDate.isEmpty()) {
-                for (Shift existing : shiftsForDate) {
-                    boolean isSameId = entity.getId() != null && entity.getId().equals(existing.getId());
-                    boolean isNotDeleted = existing.getDeletedAt() == null;
+            // First check for active shift conflicts (same date, not deleted, different ID)
+            for (Shift existing : shiftsForDate) {
+                boolean isSameId = entity.getId() != null && entity.getId().equals(existing.getId());
+                boolean isNotDeleted = existing.getDeletedAt() == null;
 
-                    if (!isSameId && isNotDeleted) {
-                        String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
-                        throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
-                    }
+                if (!isSameId && isNotDeleted) {
+                    String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
+                    throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
+                }
+            }
 
-                    if (isSameId || !isNotDeleted) {
-                        existing.setDeletedAt(null);
-                        existing.setStatus(true);
-                        existing.setEmployee(entity.getEmployee());
-                        existing.setLocation(entity.getLocation());
-                        existing.setShiftType(entity.getShiftType());
-                        existing.setDate(entity.getDate());
-                        existing.setNotes(entity.getNotes());
-                        existing.setUpdatedBy(entity.getCreatedBy());
-                        return super.save(existing);
-                    }
+            // Then check for deleted shifts to reactivate
+            for (Shift existing : shiftsForDate) {
+                boolean isSameId = entity.getId() != null && entity.getId().equals(existing.getId());
+                boolean isNotDeleted = existing.getDeletedAt() == null;
+
+                if (isSameId || !isNotDeleted) {
+                    existing.setDeletedAt(null);
+                    existing.setStatus(true);
+                    existing.setEmployee(entity.getEmployee());
+                    existing.setLocation(entity.getLocation());
+                    existing.setShiftType(entity.getShiftType());
+                    existing.setDate(entity.getDate());
+                    existing.setNotes(entity.getNotes());
+                    existing.setUpdatedBy(entity.getCreatedBy());
+                    return super.save(existing);
                 }
             }
         }
