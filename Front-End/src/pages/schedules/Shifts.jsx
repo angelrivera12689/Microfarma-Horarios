@@ -432,10 +432,14 @@ const Shifts = () => {
     // Prevent multiple submissions
     if (submitting) return;
 
-    // Verificar si ya existe un turno para esta fecha antes de crear
-    if (existingShiftWarning) {
-      setFormError('No se pudo crear el turno: Ya existe una asignación para este empleado en la fecha seleccionada.');
-      return;
+    // Verificar si ya existe un turno para esta fecha y ubicación antes de crear
+    if (existingShiftWarning && existingShiftWarning.existingShift) {
+      // Solo impedir si el turno existente está en la misma ubicación
+      if (existingShiftWarning.existingShift.location && existingShiftWarning.existingShift.location.id === formData.locationId) {
+        setFormError('No se pudo crear el turno: Ya existe una asignación para este empleado en la fecha y ubicación seleccionadas.');
+        return;
+      }
+      // Si está en una ubicación diferente, permitir crear el turno (mostrar advertencia pero no impedir)
     }
 
     setFormError(null);

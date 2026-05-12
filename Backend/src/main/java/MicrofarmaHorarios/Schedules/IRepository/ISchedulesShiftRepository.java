@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import MicrofarmaHorarios.HumanResources.Entity.Employee;
+import MicrofarmaHorarios.Organization.Entity.Location;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
 
 @Repository
@@ -26,6 +27,10 @@ public interface ISchedulesShiftRepository extends ISchedulesBaseRepository<Shif
     Optional<Shift> findByEmployeeAndDate(Employee employee, LocalDate date);
 
     Optional<Shift> findByEmployeeAndDateAndStatusTrue(Employee employee, LocalDate date);
+
+    Optional<Shift> findByEmployeeAndDateAndLocationAndStatusTrue(Employee employee, LocalDate date, Location location);
+
+    List<Shift> findByEmployee_IdAndDateAndStatusTrue(String employeeId, LocalDate date);
 
     // New method to find any shift (active or deleted) for employee and date
     Optional<Shift> findByEmployeeAndDateAndDeletedAtIsNull(Employee employee, LocalDate date);

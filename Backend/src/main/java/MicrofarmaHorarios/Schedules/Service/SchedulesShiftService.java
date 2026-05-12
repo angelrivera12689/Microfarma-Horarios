@@ -82,14 +82,17 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                     .filter(s -> s.getDate() != null && s.getDate().equals(entity.getDate()))
                     .toList();
 
-            // First check for active shift conflicts (same date, not deleted, different ID)
+            // First check for active shift conflicts (same date and location, not deleted, different ID)
             for (Shift existing : shiftsForDate) {
                 boolean isSameId = entity.getId() != null && entity.getId().equals(existing.getId());
                 boolean isNotDeleted = existing.getDeletedAt() == null;
+                boolean isSameLocation = existing.getLocation() != null && entity.getLocation() != null &&
+                                        existing.getLocation().getId().equals(entity.getLocation().getId());
 
-                if (!isSameId && isNotDeleted) {
+                if (!isSameId && isNotDeleted && isSameLocation) {
                     String employeeName = entity.getEmployee().getFirstName() + " " + entity.getEmployee().getLastName();
-                    throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate());
+                    String locationName = entity.getLocation().getName();
+                    throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + entity.getDate() + " en la ubicación " + locationName);
                 }
             }
 
@@ -668,12 +671,13 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
                 }
             }
 
-            if (shift.getEmployee() != null && shift.getDate() != null) {
-                Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDateAndStatusTrue(shift.getEmployee(), shift.getDate());
+            if (shift.getEmployee() != null && shift.getDate() != null && shift.getLocation() != null) {
+                Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDateAndLocationAndStatusTrue(shift.getEmployee(), shift.getDate(), shift.getLocation());
                 if (existingShift.isPresent()) {
                     if (shift.getId() == null || !shift.getId().equals(existingShift.get().getId())) {
                         String employeeName = shift.getEmployee().getFirstName() + " " + shift.getEmployee().getLastName();
-                        throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + shift.getDate() + ". Los turnos duplicados no serán guardados.");
+                        String locationName = shift.getLocation().getName();
+                        throw new Exception("El empleado " + employeeName + " ya tiene un turno asignado para la fecha " + shift.getDate() + " en la ubicación " + locationName + ". Los turnos duplicados no serán guardados.");
                     }
                 }
             }

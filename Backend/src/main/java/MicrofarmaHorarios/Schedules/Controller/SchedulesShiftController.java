@@ -69,15 +69,21 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
                         .body(new ApiResponseDto<Shift>("Empleado no encontrado", null, false));
             }
             
-            // Solo buscar turnos activos para el check
-            Optional<Shift> existingShift = shiftRepository.findByEmployeeAndDateAndStatusTrue(employeeOpt.get(), date);
-            if (existingShift.isPresent()) {
-                Shift shift = existingShift.get();
-                String message = "El empleado ya tiene un turno asignado para esta fecha: " + 
-                    shift.getShiftType().getName() + " (" + 
-                    shift.getShiftType().getStartTime().toString().substring(0,5) + " - " + 
-                    shift.getShiftType().getEndTime().toString().substring(0,5) + ")";
-                return ResponseEntity.ok(new ApiResponseDto<>(message, shift, true));
+            // Buscar todos los turnos activos para el empleado en esa fecha (puede haber múltiples en diferentes ubicaciones)
+            List<Shift> existingShifts = shiftRepository.findByEmployee_IdAndDateAndStatusTrue(employeeOpt.get().getId(), date);
+            if (!existingShifts.isEmpty()) {
+                // Devolver información del primer turno encontrado, pero indicar que puede haber múltiples
+                Shift firstShift = existingShifts.get(0);
+                String message = "El empleado ya tiene turno(s) asignado(s) para esta fecha. ";
+                if (existingShifts.size() == 1) {
+                    message += "Turno existente: " + firstShift.getShiftType().getName() + " (" + 
+                        firstShift.getShiftType().getStartTime().toString().substring(0,5) + " - " + 
+                        firstShift.getShiftType().getEndTime().toString().substring(0,5) + ") en " + firstShift.getLocation().getName() + 
+                        ". Puede crear turnos adicionales en otras ubicaciones.";
+                } else {
+                    message += "Tiene " + existingShifts.size() + " turnos asignados en diferentes ubicaciones. Puede crear turnos adicionales.";
+                }
+                return ResponseEntity.ok(new ApiResponseDto<>(message, firstShift, true));
             } else {
                 return ResponseEntity.ok(new ApiResponseDto<>("No hay turno asignado para esta fecha", null, true));
             }

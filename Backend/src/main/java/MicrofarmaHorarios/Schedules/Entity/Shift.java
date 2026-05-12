@@ -15,7 +15,7 @@ import MicrofarmaHorarios.Organization.Entity.Location;
 
 @Entity
 @Table(name = "shift", uniqueConstraints = {
-    @UniqueConstraint(name = "uk_shift_employee_date", columnNames = {"employee_id", "date"})
+    @UniqueConstraint(name = "uk_shift_employee_date_location", columnNames = {"employee_id", "date", "location_id"})
 })
 @Data
 public class Shift extends ASchedulesBaseEntity {
