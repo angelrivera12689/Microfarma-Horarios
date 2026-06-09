@@ -142,34 +142,38 @@ public class SchedulesImportController {
                     continue;
                 }
                 
-                // Check if shift already exists
-                // Solo buscar turnos activos para importar en la misma ubicación
-                Optional<Shift> existingShift = shiftRepository
-                        .findByEmployeeAndDateAndLocationAndStatusTrue(employee, shiftData.getDate(), location);
-                
-                if (existingShift.isPresent() && !overwrite) {
-                    importedShifts.add(ShiftImportDetailDto.builder()
-                            .id(existingShift.get().getId())
-                            .date(shiftData.getDate())
-                            .employeeName(employee != null ? employee.getFirstName() + " " + employee.getLastName() : null)
-                            .locationName(location != null ? location.getName() : null)
-                            .shiftTypeName(shiftData.getShiftTypeName())
-                            .startTime(shiftData.getStartTime())
-                            .endTime(shiftData.getEndTime())
-                            .status("SKIPPED")
-                            .build());
-                    continue;
-                }
-                
-                // Get or create shift type
-                ShiftType shiftType = shiftTypeDetectionService.findOrCreateShiftType(
-                        shiftData.getShiftTypeName(),
-                        shiftData.getStartTime(),
-                        shiftData.getEndTime()
-                );
+// Get or create shift type
+            ShiftType shiftType = shiftTypeDetectionService.findOrCreateShiftType(
+                    shiftData.getShiftTypeName(),
+                    shiftData.getStartTime(),
+                    shiftData.getEndTime()
+            );
+
+            // Buscar turnos activos en la misma ubicación y fecha.
+            List<Shift> existingShifts = shiftRepository
+                    .findByEmployeeAndDateAndLocationAndStatusTrue(employee, shiftData.getDate(), location);
+            Optional<Shift> exactExistingShift = existingShifts.stream()
+                    .filter(s -> s.getShiftType() != null && s.getShiftType().getId() != null
+                            && shiftType.getId() != null
+                            && s.getShiftType().getId().equals(shiftType.getId()))
+                    .findFirst();
+
+            if (exactExistingShift.isPresent() && !overwrite) {
+                importedShifts.add(ShiftImportDetailDto.builder()
+                        .id(exactExistingShift.get().getId())
+                        .date(shiftData.getDate())
+                        .employeeName(employee != null ? employee.getFirstName() + " " + employee.getLastName() : null)
+                        .locationName(location != null ? location.getName() : null)
+                        .shiftTypeName(shiftData.getShiftTypeName())
+                        .startTime(shiftData.getStartTime())
+                        .endTime(shiftData.getEndTime())
+                        .status("SKIPPED")
+                        .build());
+                continue;
+            }
                 
                 // Create or update shift
-                Shift shift = existingShift.orElseGet(Shift::new);
+                Shift shift = exactExistingShift.orElseGet(Shift::new);
                 shift.setDate(shiftData.getDate());
                 shift.setEmployee(employee);
                 shift.setLocation(location);
@@ -186,7 +190,7 @@ public class SchedulesImportController {
                         .shiftTypeName(shiftData.getShiftTypeName())
                         .startTime(shiftData.getStartTime())
                         .endTime(shiftData.getEndTime())
-                        .status(existingShift.isPresent() ? "UPDATED" : "CREATED")
+                        .status(exactExistingShift.isPresent() ? "UPDATED" : "CREATED")
                         .build());
                 
                 importedCount++;

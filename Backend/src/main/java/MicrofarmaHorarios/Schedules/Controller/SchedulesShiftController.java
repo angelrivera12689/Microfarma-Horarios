@@ -74,14 +74,14 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
             if (!existingShifts.isEmpty()) {
                 // Devolver información del primer turno encontrado, pero indicar que puede haber múltiples
                 Shift firstShift = existingShifts.get(0);
-                String message = "El empleado ya tiene turno(s) asignado(s) para esta fecha. ";
+                String message = "El empleado ya tiene turno(s) asignado(s) para esta fecha.";
                 if (existingShifts.size() == 1) {
-                    message += "Turno existente: " + firstShift.getShiftType().getName() + " (" + 
+                    message += " Turno existente: " + firstShift.getShiftType().getName() + " (" + 
                         firstShift.getShiftType().getStartTime().toString().substring(0,5) + " - " + 
                         firstShift.getShiftType().getEndTime().toString().substring(0,5) + ") en " + firstShift.getLocation().getName() + 
-                        ". Puede crear turnos adicionales en otras ubicaciones.";
+                        ". Puede crear turnos adicionales incluso en la misma ubicación si son de distinto tipo.";
                 } else {
-                    message += "Tiene " + existingShifts.size() + " turnos asignados en diferentes ubicaciones. Puede crear turnos adicionales.";
+                    message += " Tiene " + existingShifts.size() + " turnos asignados para esta fecha. Puede crear turnos adicionales si son de distinto tipo.";
                 }
                 return ResponseEntity.ok(new ApiResponseDto<>(message, firstShift, true));
             } else {

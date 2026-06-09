@@ -28,7 +28,7 @@ public interface ISchedulesShiftRepository extends ISchedulesBaseRepository<Shif
 
     Optional<Shift> findByEmployeeAndDateAndStatusTrue(Employee employee, LocalDate date);
 
-    Optional<Shift> findByEmployeeAndDateAndLocationAndStatusTrue(Employee employee, LocalDate date, Location location);
+    List<Shift> findByEmployeeAndDateAndLocationAndStatusTrue(Employee employee, LocalDate date, Location location);
 
     List<Shift> findByEmployee_IdAndDateAndStatusTrue(String employeeId, LocalDate date);
 
