@@ -17,6 +17,8 @@ public interface ISchedulesShiftService extends ISchedulesBaseService<Shift> {
 
     byte[] generateCalendarPdf(int year, int month, String locationId, String employeeId, boolean deliveryOnly) throws Exception;
 
+    byte[] generateCalendarPdfAllLocations(int year, int month, boolean deliveryOnly) throws Exception;
+
     byte[] generatePersonalShiftsPdf(String employeeId) throws Exception;
 
     List<Shift> saveAll(List<Shift> shifts) throws Exception;

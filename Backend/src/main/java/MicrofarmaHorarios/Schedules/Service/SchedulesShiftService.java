@@ -16,6 +16,7 @@ import com.itextpdf.kernel.geom.PageSize;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.AreaBreak;
 import com.itextpdf.layout.element.Cell;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
@@ -623,6 +624,235 @@ public class SchedulesShiftService extends ASchedulesBaseService<Shift> implemen
             document.close();
             return baos.toByteArray();
         }
+    }
+
+    @Override
+    public byte[] generateCalendarPdfAllLocations(int year, int month, boolean deliveryOnly) throws Exception {
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        List<Shift> shifts = findByDateBetween(startDate, endDate).stream()
+                .filter(s -> s.getEmployee() != null && s.getStatus() != null && s.getStatus())
+                .toList();
+
+        if (deliveryOnly) {
+            shifts = shifts.stream()
+                    .filter(s -> s.getEmployee().getPosition() != null &&
+                            s.getEmployee().getPosition().getName() != null &&
+                            s.getEmployee().getPosition().getName().toLowerCase().contains("domicili"))
+                    .toList();
+        }
+
+        List<Location> locations = locationService.all();
+        if (locations == null || locations.isEmpty()) {
+            return generateCalendarPdf(year, month, null, null, deliveryOnly);
+        }
+
+        String[] months = {"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(baos);
+        PdfDocument pdfDoc = new PdfDocument(writer);
+        pdfDoc.setDefaultPageSize(PageSize.LETTER.rotate());
+
+        Document document = new Document(pdfDoc);
+        document.setMargins(28, 28, 28, 28);
+
+        boolean firstPage = true;
+        int pagesAdded = 0;
+        for (Location location : locations) {
+            List<Shift> locationShifts = shifts.stream()
+                    .filter(s -> s.getLocation() != null && s.getLocation().getId().equals(location.getId()))
+                    .toList();
+
+            if (locationShifts.isEmpty()) {
+                continue;
+            }
+
+            if (!firstPage) {
+                document.add(new AreaBreak());
+            }
+            firstPage = false;
+            pagesAdded++;
+
+            addCalendarPage(document, year, month, "Sede: " + location.getName(), locationShifts, deliveryOnly);
+        }
+
+        if (pagesAdded == 0) {
+            document.add(new Paragraph("No hay turnos programados para ninguna sede en el mes de " +
+                    months[month - 1] + " " + year + ".")
+                    .setFontSize(14)
+                    .setFontColor(ColorConstants.GRAY)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setItalic()
+                    .setMarginTop(50)
+                    .setMarginBottom(50));
+        }
+
+        document.close();
+        return baos.toByteArray();
+    }
+
+    private void addCalendarPage(Document document, int year, int month, String pageTitle, List<Shift> shifts, boolean deliveryOnly) {
+        Color emsRed = new DeviceRgb(220, 20, 60);
+        Color lightRed = new DeviceRgb(255, 235, 238);
+        Color lightGreen = new DeviceRgb(220, 255, 220);
+        Color darkRed = new DeviceRgb(183, 28, 28);
+        Color white = new DeviceRgb(255, 255, 255);
+        Color lightGray = new DeviceRgb(243, 244, 246);
+
+        String[] months = {"Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"};
+
+        Paragraph title = new Paragraph(pageTitle)
+                .setFontSize(22)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(darkRed)
+                .setBold()
+                .setMarginBottom(6);
+        document.add(title);
+
+        Paragraph subtitle = new Paragraph("Calendario de Turnos - " + months[month - 1] + " " + year)
+                .setFontSize(13)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontColor(ColorConstants.GRAY)
+                .setMarginBottom(12);
+        document.add(subtitle);
+
+        Table headerTable = new Table(new float[] {1});
+        headerTable.setWidth(UnitValue.createPercentValue(100));
+        headerTable.setMarginBottom(14);
+
+        Cell headerCell = new Cell().setBackgroundColor(emsRed).setPadding(8);
+        headerCell.add(new Paragraph("Microfarma Horarios")
+                .setFontSize(18)
+                .setFontColor(white)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setBold());
+        headerCell.add(new Paragraph("Sistema de Gestión de Horarios Laborales")
+                .setFontSize(10)
+                .setFontColor(white)
+                .setTextAlignment(TextAlignment.CENTER)
+                .setMarginTop(3));
+        headerTable.addCell(headerCell);
+        document.add(headerTable);
+
+        if (shifts.isEmpty()) {
+            Paragraph noShiftsMessage = new Paragraph("No hay turnos programados para esta sede en el mes de " + months[month - 1] + " " + year + ".")
+                    .setFontSize(14)
+                    .setFontColor(ColorConstants.GRAY)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setItalic()
+                    .setMarginTop(50)
+                    .setMarginBottom(50);
+            document.add(noShiftsMessage);
+            return;
+        }
+
+        float[] columnWidths = {1, 1, 1, 1, 1, 1, 1};
+        Table table = new Table(columnWidths);
+        table.setWidth(UnitValue.createPercentValue(100));
+        table.setMarginTop(8);
+
+        String[] daysOfWeek = {"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"};
+        for (String day : daysOfWeek) {
+            Cell cell = new Cell()
+                    .add(new Paragraph(day).setFontSize(10).setTextAlignment(TextAlignment.CENTER).setBold())
+                    .setBackgroundColor(darkRed)
+                    .setFontColor(white)
+                    .setPadding(7);
+            table.addHeaderCell(cell);
+        }
+
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        int firstDayOfWeek = startDate.getDayOfWeek().getValue() % 7;
+        int daysInMonth = endDate.getDayOfMonth();
+
+        for (int i = 0; i < firstDayOfWeek; i++) {
+            Cell emptyCell = new Cell().setBackgroundColor(lightGray).setPadding(6);
+            emptyCell.setKeepTogether(true);
+            table.addCell(emptyCell);
+        }
+
+        for (int day = 1; day <= daysInMonth; day++) {
+            LocalDate currentDate = LocalDate.of(year, month, day);
+            List<Shift> dayShifts = shifts.stream()
+                    .filter(s -> s.getDate().equals(currentDate))
+                    .sorted((a, b) -> a.getShiftType().getStartTime().compareTo(b.getShiftType().getStartTime()))
+                    .toList();
+
+            Cell cell = new Cell().setPadding(5).setBackgroundColor(white);
+            cell.setKeepTogether(true);
+
+            Paragraph dayNumber = new Paragraph(String.valueOf(day))
+                    .setFontSize(10)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setBold()
+                    .setFontColor(darkRed)
+                    .setMarginBottom(2);
+            cell.add(dayNumber);
+
+            if (dayShifts.isEmpty()) {
+                Paragraph noShifts = new Paragraph("Sin turnos")
+                        .setFontSize(8)
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontColor(ColorConstants.GRAY)
+                        .setItalic();
+                cell.add(noShifts);
+            } else {
+                for (Shift shift : dayShifts) {
+                    String employeeName = formatEmployeeName(
+                            shift.getEmployee().getFirstName(),
+                            shift.getEmployee().getLastName()
+                    );
+                    String shiftTypeName = shift.getShiftType().getName();
+                    boolean isDescanso = shiftTypeName.toUpperCase().contains("DESCANSO")
+                            || shiftTypeName.toUpperCase().contains("OFF");
+
+                    String shiftAbbr = abbreviateShiftType(shiftTypeName);
+
+                    String time = "";
+                    if (!isDescanso) {
+                        if (shift.getShiftType().getTimeRanges() != null &&
+                                !shift.getShiftType().getTimeRanges().isEmpty()) {
+                            time = shift.getShiftType().getFormattedTimeRanges();
+                        } else {
+                            time = formatTimeCompact(shift.getShiftType().getStartTime()) + "-" + formatTimeCompact(shift.getShiftType().getEndTime());
+                        }
+                    }
+
+                    String shiftInfo = shiftAbbr;
+                    StringBuilder line = new StringBuilder();
+                    line.append(employeeName);
+                    line.append(" · ").append(shiftInfo);
+                    if (!isDescanso && !time.isEmpty()) {
+                        line.append(" · ").append(time);
+                    }
+
+                    Color bgColor = isDescanso ? lightGreen : lightRed;
+                    Paragraph shiftParagraph = new Paragraph(line.toString())
+                            .setFontSize(6)
+                            .setBackgroundColor(bgColor)
+                            .setPadding(2)
+                            .setMarginBottom(1)
+                            .setMarginTop(0);
+                    cell.add(shiftParagraph);
+                }
+            }
+
+            table.addCell(cell);
+        }
+
+        int totalCells = firstDayOfWeek + daysInMonth;
+        int remainingCells = ((totalCells + 6) / 7 * 7) - totalCells;
+        for (int i = 0; i < remainingCells; i++) {
+            Cell emptyCell = new Cell().setBackgroundColor(lightGray).setPadding(6);
+            emptyCell.setKeepTogether(true);
+            table.addCell(emptyCell);
+        }
+
+        document.add(table);
     }
 
     @Override

@@ -73,6 +73,29 @@ class ShiftService {
     }
   }
 
+  async downloadCalendarPdfAllLocations(year, month, deliveryOnly = false) {
+    let endpoint = `/api/schedules/shifts/pdf/${year}/${month}/all-locations`;
+    if (deliveryOnly) {
+      endpoint += '?deliveryOnly=true';
+    }
+
+    const blob = await apiClient.get(endpoint, {
+      responseType: 'blob'
+    });
+
+    if (blob) {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const suffix = deliveryOnly ? '_domiciliarios' : '_todas_sedes';
+      link.setAttribute('download', `calendario_turnos_${year}_${String(month).padStart(2, '0')}${suffix}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    }
+  }
+
   async downloadMyShiftsPdf() {
     const blob = await apiClient.get('/api/schedules/shifts/me/pdf', {
       responseType: 'blob'

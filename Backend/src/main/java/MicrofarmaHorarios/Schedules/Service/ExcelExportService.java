@@ -3,11 +3,14 @@ package MicrofarmaHorarios.Schedules.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Month;
 import java.time.format.TextStyle;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.*;
@@ -378,80 +381,105 @@ public class ExcelExportService {
                 })
                 .collect(Collectors.toList());
 
-            String currentLocation = "";
-            String currentEmployee = "";
-            int dataRow = 0;
+            int maxDayOfMonth = LocalDate.of(year, month, 1).lengthOfMonth();
 
-            for (int i = 0; i < sortedShifts.size(); i++) {
+            Map<String, List<Shift>> shiftsByLocation = sortedShifts.stream()
+                    .collect(Collectors.groupingBy(
+                            s -> s.getLocation() != null ? s.getLocation().getName() : "Sin sede",
+                            LinkedHashMap::new,
+                            Collectors.toList()));
 
-                Shift shift = sortedShifts.get(i);
+            for (Map.Entry<String, List<Shift>> locationEntry : shiftsByLocation.entrySet()) {
+                String locationName = locationEntry.getKey();
+                List<Shift> locationShifts = locationEntry.getValue();
 
-                String locationName = shift.getLocation() != null ? shift.getLocation().getName() : "";
-                String empName = "";
-                if (shift.getEmployee() != null) {
-                    String firstName = shift.getEmployee().getFirstName() != null ? shift.getEmployee().getFirstName() : "";
-                    String lastName  = shift.getEmployee().getLastName()  != null ? shift.getEmployee().getLastName()  : "";
-                    empName = (firstName + " " + lastName).trim();
+                // Encabezado de sede
+                Row locRow = sheet.createRow(row++);
+                createCell(locRow, 0, "📍 " + locationName.toUpperCase(), locationHdr);
+                sheet.addMergedRegion(new CellRangeAddress(
+                        locRow.getRowNum(), locRow.getRowNum(), 0, 6));
+
+                Map<Integer, List<Shift>> shiftsByDay = locationShifts.stream()
+                        .collect(Collectors.groupingBy(
+                                s -> s.getDate() != null ? s.getDate().getDayOfMonth() : 0,
+                                LinkedHashMap::new,
+                                Collectors.toList()));
+
+                int dataRow = 0;
+                for (int day = 1; day <= maxDayOfMonth; day++) {
+                    List<Shift> dayShifts = shiftsByDay.get(day);
+                    if (dayShifts == null || dayShifts.isEmpty()) {
+                        CellStyle st = (dataRow % 2 == 0) ? even : odd;
+                        Row rw = sheet.createRow(row++);
+                        createCell(rw, 0, "", st);
+                        createCell(rw, 1, "", st);
+                        createCellInt(rw, 2, day, st);
+                        createCell(rw, 3, "", st);
+                        createCell(rw, 4, "", st);
+                        createCell(rw, 5, "", st);
+                        createCell(rw, 6, "", st);
+                        dataRow++;
+                        continue;
+                    }
+
+                    dayShifts.sort((s1, s2) -> {
+                        String emp1 = s1.getEmployee() != null
+                                ? s1.getEmployee().getLastName() + s1.getEmployee().getFirstName() : "";
+                        String emp2 = s2.getEmployee() != null
+                                ? s2.getEmployee().getLastName() + s2.getEmployee().getFirstName() : "";
+                        int empCompare = emp1.compareTo(emp2);
+                        if (empCompare != 0) return empCompare;
+
+                        String start1 = s1.getShiftType() != null && s1.getShiftType().getStartTime() != null
+                                ? s1.getShiftType().getStartTime().toString() : "";
+                        String start2 = s2.getShiftType() != null && s2.getShiftType().getStartTime() != null
+                                ? s2.getShiftType().getStartTime().toString() : "";
+                        return start1.compareTo(start2);
+                    });
+
+                    for (Shift shift : dayShifts) {
+                        CellStyle st = (dataRow % 2 == 0) ? even : odd;
+                        Row rw = sheet.createRow(row++);
+                        createCell(rw, 0, "", st);
+
+                        String empName = "";
+                        if (shift.getEmployee() != null) {
+                            String firstName = shift.getEmployee().getFirstName() != null ? shift.getEmployee().getFirstName() : "";
+                            String lastName  = shift.getEmployee().getLastName()  != null ? shift.getEmployee().getLastName()  : "";
+                            empName = (firstName + " " + lastName).trim();
+                        }
+                        createCell(rw, 1, empName, st);
+                        createCellInt(rw, 2, day, st);
+
+                        String horaInicio = "";
+                        if (shift.getShiftType() != null && shift.getShiftType().getStartTime() != null) {
+                            horaInicio = shift.getShiftType().getStartTime().toString();
+                            if (horaInicio.length() > 5) horaInicio = horaInicio.substring(0, 5);
+                        }
+                        createCell(rw, 3, horaInicio, st);
+
+                        String horaFin = "";
+                        if (shift.getShiftType() != null && shift.getShiftType().getEndTime() != null) {
+                            horaFin = shift.getShiftType().getEndTime().toString();
+                            if (horaFin.length() > 5) horaFin = horaFin.substring(0, 5);
+                        }
+                        createCell(rw, 4, horaFin, st);
+
+                        double horasTurno = 0.0;
+                        if (shift.getShiftType() != null
+                                && shift.getShiftType().getStartTime() != null
+                                && shift.getShiftType().getEndTime() != null) {
+                            LocalTime start = shift.getShiftType().getStartTime();
+                            LocalTime end   = shift.getShiftType().getEndTime();
+                            long minutos    = Duration.between(start, end).toMinutes();
+                            if (minutos < 0) minutos += 24 * 60;
+                            horasTurno = minutos / 60.0;
+                        }
+                        createCell(rw, 5, horasTurno, st);
+                        createCell(rw, 6, shift.getShiftType() != null ? shift.getShiftType().getName() : "", st);
+                        dataRow++;
+                    }
                 }
-
-                // ✅ CORRECCIÓN: primero insertar encabezado de sede,
-                //    luego crear la fila de datos — siempre en orden
-                if (!locationName.equals(currentLocation)) {
-                    currentLocation = locationName;
-                    currentEmployee = "";
-                    dataRow = 0;
-
-                    // Fila de encabezado de sede
-                    Row locRow = sheet.createRow(row++);
-                    createCell(locRow, 0, "📍 " + locationName.toUpperCase(), locationHdr);
-                    sheet.addMergedRegion(new CellRangeAddress(
-                            locRow.getRowNum(), locRow.getRowNum(), 0, 6));
-                }
-
-                // Fila de datos — siempre se crea después del encabezado
-                CellStyle st = (dataRow % 2 == 0) ? even : odd;
-                Row rw = sheet.createRow(row++);
-
-                createCell(rw, 0, "", st);
-
-                if (!empName.equals(currentEmployee)) {
-                    currentEmployee = empName;
-                }
-                createCell(rw, 1, empName, st);
-
-                int dayOfMonth = shift.getDate() != null ? shift.getDate().getDayOfMonth() : 0;
-                createCellInt(rw, 2, dayOfMonth, st);
-
-                String horaInicio = "";
-                if (shift.getShiftType() != null && shift.getShiftType().getStartTime() != null) {
-                    horaInicio = shift.getShiftType().getStartTime().toString();
-                    if (horaInicio.length() > 5) horaInicio = horaInicio.substring(0, 5);
-                }
-                createCell(rw, 3, horaInicio, st);
-
-                String horaFin = "";
-                if (shift.getShiftType() != null && shift.getShiftType().getEndTime() != null) {
-                    horaFin = shift.getShiftType().getEndTime().toString();
-                    if (horaFin.length() > 5) horaFin = horaFin.substring(0, 5);
-                }
-                createCell(rw, 4, horaFin, st);
-
-                double horasTurno = 0.0;
-                if (shift.getShiftType() != null
-                        && shift.getShiftType().getStartTime() != null
-                        && shift.getShiftType().getEndTime() != null) {
-
-                    LocalTime start = shift.getShiftType().getStartTime();
-                    LocalTime end   = shift.getShiftType().getEndTime();
-                    long minutos    = Duration.between(start, end).toMinutes();
-                    if (minutos < 0) minutos += 24 * 60;
-                    horasTurno = minutos / 60.0;
-                }
-                createCell(rw, 5, horasTurno, st);
-
-                createCell(rw, 6, shift.getShiftType() != null ? shift.getShiftType().getName() : "", st);
-
-                dataRow++;
             }
 
             // Fila total

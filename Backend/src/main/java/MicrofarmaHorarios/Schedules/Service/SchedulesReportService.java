@@ -22,6 +22,7 @@ import MicrofarmaHorarios.Schedules.DTO.Response.ReportResponseDto;
 import MicrofarmaHorarios.Schedules.Entity.Shift;
 import MicrofarmaHorarios.Schedules.Entity.ShiftTimeRange;
 import MicrofarmaHorarios.Schedules.Entity.ShiftType;
+import MicrofarmaHorarios.HumanResources.Entity.Employee;
 import MicrofarmaHorarios.Schedules.IRepository.ISchedulesShiftRepository;
 import MicrofarmaHorarios.Schedules.IService.ISchedulesReportService;
 
@@ -121,13 +122,18 @@ public class SchedulesReportService implements ISchedulesReportService {
             globalTotalShifts += locationTotalShifts;
         }
 
-        // Collect all employees from all locations
-        List<EmployeeReportDto> allEmployees = locationReports.stream()
-                .flatMap(location -> location.getEmployeeReports().stream())
+        // Collect all employees from all shifts by unique employee
+        Map<String, List<Shift>> shiftsByEmployeeAll = shifts.stream()
+                .filter(shift -> shift.getEmployee() != null && shift.getEmployee().getId() != null)
+                .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId()));
+
+        List<EmployeeReportDto> allEmployees = shiftsByEmployeeAll.entrySet().stream()
+                .map(entry -> calculateEmployeeReport(entry.getValue()))
+                .filter(report -> report != null)
                 .collect(Collectors.toList());
 
         GlobalReportDto global = new GlobalReportDto(
-                globalTotalEmployees,
+                allEmployees.size(),
                 globalTotalHours,
                 globalTotalOvertime,
                 globalRegularHours,
@@ -230,61 +236,60 @@ public class SchedulesReportService implements ISchedulesReportService {
         double dominicalHours = 0;
         double festivoHours = 0;
 
+        Map<LocalDate, Integer> dailyRegularMinutes = new java.util.HashMap<>();
+
         for (Shift shift : shifts) {
             if (shift.getShiftType() == null) continue;
-            
-            // Use new time ranges method if available, otherwise fallback to simple calculation
-            double hours;
-            if (shift.getShiftType().getTimeRanges() != null && 
-                !shift.getShiftType().getTimeRanges().isEmpty()) {
-                hours = shift.getShiftType().getTotalDurationHours();
-            } else {
-                hours = calculateHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime());
-            }
+
+            double hours = shift.getShiftType().getTimeRanges() != null && 
+                    !shift.getShiftType().getTimeRanges().isEmpty()
+                    ? shift.getShiftType().getTotalDurationHours()
+                    : calculateHours(shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime());
             totalHours += hours;
 
-            // Determinar tipo de día
-            boolean isSunday = shift.getDate().getDayOfWeek().getValue() == 7;
-            boolean isHoliday = holidayService.isHoliday(shift.getDate());
-            boolean isSpecialDay = isSunday || isHoliday;
+            List<ShiftSegment> segments = splitShiftIntoSegments(shift);
+            double overtimeForShift = 0.0;
 
-            // Debug logging removed
+            for (ShiftSegment segment : segments) {
+                int durationMinutes = segment.getDurationMinutes();
+                int usedRegular = dailyRegularMinutes.getOrDefault(segment.getDate(), 0);
+                int availableRegular = Math.max(0, 8 * 60 - usedRegular);
+                int regularMinutes = Math.min(durationMinutes, availableRegular);
+                int overtimeMinutes = durationMinutes - regularMinutes;
 
-            double regularHoursPerDay = 8.0;
-            double regularForThisShift = Math.min(hours, regularHoursPerDay);
-            double extraForThisShift = Math.max(0, hours - regularHoursPerDay);
+                dailyRegularMinutes.put(segment.getDate(), usedRegular + regularMinutes);
 
-            // Horas regulares
-            if (isSpecialDay) {
-                if (isSunday) {
-                    dominicalHours += regularForThisShift;
-                } else {
-                    festivoHours += regularForThisShift;
-                }
-            } else {
-                regularHours += regularForThisShift;
-            }
-
-            // Horas extras
-            if (extraForThisShift > 0) {
-                overtimeHours += extraForThisShift;
-                overtimeDetails.add(new OvertimeDetailDto(shift.getDate(), extraForThisShift, shift.getNotes(), shift.getLocation().getName()));
-
-                // Categorizar horas extras por tiempo
-                double diurnaExtra = calculateDiurnaExtraHours(shift.getShiftType(), extraForThisShift);
-                double nocturnaExtra = extraForThisShift - diurnaExtra;
-
-                diurnaExtraHours += diurnaExtra;
-                nocturnaExtraHours += nocturnaExtra;
-
-                // Las horas extras en días especiales también se cuentan en dominical/festivo
-                if (isSpecialDay) {
+                if (regularMinutes > 0) {
+                    boolean isSunday = segment.getDate().getDayOfWeek().getValue() == 7;
+                    boolean isHoliday = holidayService.isHoliday(segment.getDate());
                     if (isSunday) {
-                        dominicalHours += extraForThisShift;
+                        dominicalHours += regularMinutes / 60.0;
+                    } else if (isHoliday) {
+                        festivoHours += regularMinutes / 60.0;
                     } else {
-                        festivoHours += extraForThisShift;
+                        regularHours += regularMinutes / 60.0;
                     }
                 }
+
+                if (overtimeMinutes > 0) {
+                    overtimeForShift += overtimeMinutes / 60.0;
+                    LocalTime overtimeStart = segment.getStart().plusMinutes(regularMinutes);
+                    LocalTime overtimeEnd = segment.getEnd();
+                    double diurnaExtra = calculateOverlapHours(overtimeStart, overtimeEnd,
+                            LocalTime.of(6, 0), LocalTime.of(19, 0));
+                    double nocturnaExtra = (overtimeMinutes / 60.0) - diurnaExtra;
+                    diurnaExtraHours += diurnaExtra;
+                    nocturnaExtraHours += nocturnaExtra;
+                }
+            }
+
+            if (overtimeForShift > 0) {
+                overtimeHours += overtimeForShift;
+                overtimeDetails.add(new OvertimeDetailDto(
+                        shift.getDate(),
+                        overtimeForShift,
+                        shift.getNotes(),
+                        shift.getLocation() != null ? shift.getLocation().getName() : null));
             }
         }
 
@@ -345,60 +350,99 @@ public class SchedulesReportService implements ISchedulesReportService {
      * Calcula las horas extras diurnas (6:00 AM - 7:00 PM) en un turno
      * Soporta turnos multi-rango (PARTIDO)
      */
-    private double calculateDiurnaExtraHours(ShiftType shiftType, double extraHours) {
-        if (shiftType == null || extraHours <= 0) {
-            return 0.0;
+    private static class ShiftSegment {
+        private final LocalDate date;
+        private final LocalTime start;
+        private final LocalTime end;
+
+        public ShiftSegment(LocalDate date, LocalTime start, LocalTime end) {
+            this.date = date;
+            this.start = start;
+            this.end = end;
         }
 
-        LocalTime diurnaStart = LocalTime.of(6, 0);
-        LocalTime diurnaEnd = LocalTime.of(19, 0); // 7:00 PM
+        public LocalDate getDate() {
+            return date;
+        }
 
-        // Si es un turno multi-rango (PARTIDO), usar los timeRanges
-        if (shiftType.getIsMultiRange() != null && shiftType.getIsMultiRange() && 
-            shiftType.getTimeRanges() != null && !shiftType.getTimeRanges().isEmpty()) {
-            
-            double diurnaExtra = 0;
-            for (ShiftTimeRange range : shiftType.getTimeRanges()) {
-                LocalTime rangeStart = range.getStartTime();
-                LocalTime rangeEnd = range.getEndTime();
-                
-                // Calcular portion de este rango que es extra
-                double rangeTotalHours = range.getDurationHours();
-                double rangeExtra = Math.max(0, rangeTotalHours - 8.0); // 8 horas regulares por turno
-                
-                // Calcular portion diurna de las extras
-                if (rangeEnd.isAfter(diurnaStart) && rangeStart.isBefore(diurnaEnd)) {
-                    // La porción diurna es el mínimo entre las horas extra del rango y el tiempo en horario diurno
-                    LocalTime effectiveStart = rangeStart.isBefore(diurnaStart) ? diurnaStart : rangeStart;
-                    LocalTime effectiveEnd = rangeEnd.isAfter(diurnaEnd) ? diurnaEnd : rangeEnd;
-                    if (effectiveEnd.isAfter(effectiveStart)) {
-                        diurnaExtra += Math.min(rangeExtra, calculateHours(effectiveStart, effectiveEnd));
-                    }
-                }
+        public LocalTime getStart() {
+            return start;
+        }
+
+        public LocalTime getEnd() {
+            return end;
+        }
+
+        public int getDurationMinutes() {
+            int startMinutes = start.getHour() * 60 + start.getMinute();
+            int endMinutes = end.getHour() * 60 + end.getMinute();
+            if (endMinutes < startMinutes) {
+                return (24 * 60 - startMinutes) + endMinutes;
             }
-            return diurnaExtra;
+            return endMinutes - startMinutes;
+        }
+    }
+
+    private List<ShiftSegment> splitShiftIntoSegments(Shift shift) {
+        List<ShiftSegment> segments = new ArrayList<>();
+        if (shift == null || shift.getShiftType() == null) {
+            return segments;
         }
 
-        // Fallback para turnos simples
-        LocalTime start = shiftType.getStartTime();
-        LocalTime end = shiftType.getEndTime();
-        
+        if (shift.getShiftType().getTimeRanges() != null && !shift.getShiftType().getTimeRanges().isEmpty()) {
+            for (ShiftTimeRange range : shift.getShiftType().getTimeRanges()) {
+                appendShiftSegment(segments, shift.getDate(), range.getStartTime(), range.getEndTime());
+            }
+        } else {
+            appendShiftSegment(segments, shift.getDate(), shift.getShiftType().getStartTime(), shift.getShiftType().getEndTime());
+        }
+        return segments;
+    }
+
+    private void appendShiftSegment(List<ShiftSegment> segments, LocalDate baseDate, LocalTime start, LocalTime end) {
         if (start == null || end == null) {
-            return 0.0;
+            return;
         }
 
-        // Si el turno termina después de 7 PM, las extras son nocturnas
-        if (end.isAfter(diurnaEnd) || (end.equals(diurnaEnd) && extraHours > 0)) {
-            LocalTime extraStart = start.plusHours(8);
-            if (extraStart.isBefore(diurnaEnd)) {
-                double diurnaPortion = Math.min(extraHours, calculateHours(extraStart, diurnaEnd));
-                return diurnaPortion;
+        if (end.isBefore(start)) {
+            segments.add(new ShiftSegment(baseDate, start, LocalTime.MIDNIGHT));
+            segments.add(new ShiftSegment(baseDate.plusDays(1), LocalTime.MIDNIGHT, end));
+        } else {
+            segments.add(new ShiftSegment(baseDate, start, end));
+        }
+    }
+
+    private double calculateOverlapHours(LocalTime start, LocalTime end, LocalTime windowStart, LocalTime windowEnd) {
+        int startMinutes = toMinutes(start);
+        int endMinutes = toMinutes(end);
+        int windowStartMinutes = toMinutes(windowStart);
+        int windowEndMinutes = toMinutes(windowEnd);
+
+        int overlapMinutes = 0;
+        for (int[] segment : toSegments(startMinutes, endMinutes)) {
+            for (int[] windowSegment : toSegments(windowStartMinutes, windowEndMinutes)) {
+                int begin = Math.max(segment[0], windowSegment[0]);
+                int finish = Math.min(segment[1], windowSegment[1]);
+                overlapMinutes += Math.max(0, finish - begin);
             }
-            return 0.0; // Todas las extras son nocturnas
         }
+        return overlapMinutes / 60.0;
+    }
 
-        // Si todo el turno está en horario diurno, todas las extras son diurnas
-        return extraHours;
+    private int toMinutes(LocalTime time) {
+        return time.getHour() * 60 + time.getMinute();
+    }
+
+    private List<int[]> toSegments(int startMinutes, int endMinutes) {
+        if (endMinutes < startMinutes) {
+            List<int[]> segments = new ArrayList<>();
+            segments.add(new int[] { startMinutes, 24 * 60 });
+            segments.add(new int[] { 0, endMinutes });
+            return segments;
+        }
+        List<int[]> segments = new ArrayList<>();
+        segments.add(new int[] { startMinutes, endMinutes });
+        return segments;
     }
 
     @Override
@@ -432,14 +476,18 @@ public class SchedulesReportService implements ISchedulesReportService {
                 .collect(Collectors.toList());
         
         List<ReportFiltersDto.EmployeeFilterOption> employees = allShifts.stream()
-                .filter(shift -> shift.getEmployee() != null && shift.getEmployee().getFirstName() != null)
-                .map(shift -> new ReportFiltersDto.EmployeeFilterOption(
-                        shift.getEmployee().getId(),
-                        shift.getEmployee().getFirstName() + " " + shift.getEmployee().getLastName(),
-                        shift.getEmployee().getEmail(),
-                        shift.getEmployee().getPosition() != null ? shift.getEmployee().getPosition().getName() : null,
-                        shift.getLocation() != null ? shift.getLocation().getId() : null))
-                .distinct()
+                .filter(shift -> shift.getEmployee() != null && shift.getEmployee().getId() != null)
+                .collect(Collectors.groupingBy(shift -> shift.getEmployee().getId(), Collectors.toList()))
+                .values().stream()
+                .map(shiftsByEmployee -> {
+                    Employee employee = shiftsByEmployee.get(0).getEmployee();
+                    return new ReportFiltersDto.EmployeeFilterOption(
+                        employee.getId(),
+                        employee.getFirstName() + " " + employee.getLastName(),
+                        employee.getEmail(),
+                        employee.getPosition() != null ? employee.getPosition().getName() : null,
+                        shiftsByEmployee.get(0).getLocation() != null ? shiftsByEmployee.get(0).getLocation().getId() : null);
+                })
                 .collect(Collectors.toList());
         
         List<Integer> years = allShifts.stream()

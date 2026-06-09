@@ -504,6 +504,15 @@ const Shifts = () => {
 
 
 
+  const downloadAllLocationsPdf = async () => {
+    try {
+      await shiftService.downloadCalendarPdfAllLocations(currentYear, currentMonth + 1);
+    } catch (error) {
+      console.error('Error downloading all locations PDF:', error);
+      alert('Error al descargar el PDF de todas las sedes. Inténtalo de nuevo.');
+    }
+  };
+
   const renderCalendar = () => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
@@ -606,19 +615,27 @@ const Shifts = () => {
               ✏️ Editar en Masa
             </button>
             {viewMode === 'calendar' && (
-              <button
-                onClick={() => {
-                  if (!calendarFilterLocation) {
-                    alert('Por favor selecciona una ubicación para descargar el calendario.');
-                    return;
-                  }
-                  const locationId = locations.find(l => l.name === calendarFilterLocation)?.id;
-                  shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, locationId);
-                }}
-                className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
-              >
-                Descargar PDF
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    if (!calendarFilterLocation) {
+                      alert('Por favor selecciona una ubicación para descargar el calendario.');
+                      return;
+                    }
+                    const locationId = locations.find(l => l.name === calendarFilterLocation)?.id;
+                    shiftService.downloadCalendarPdf(currentYear, currentMonth + 1, locationId);
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors"
+                >
+                  Descargar PDF
+                </button>
+                <button
+                  onClick={downloadAllLocationsPdf}
+                  className="px-4 py-2 bg-teal-500 text-white rounded-lg font-medium hover:bg-teal-600 transition-colors"
+                >
+                  Descargar PDF Todas las Sedes
+                </button>
+              </>
             )}
           </div>
 

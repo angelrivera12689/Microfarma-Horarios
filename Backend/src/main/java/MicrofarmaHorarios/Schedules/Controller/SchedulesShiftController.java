@@ -151,6 +151,26 @@ public class SchedulesShiftController extends ASchedulesBaseController<Shift, IS
         }
     }
 
+    @GetMapping("/pdf/{year}/{month}/all-locations")
+    public ResponseEntity<byte[]> generateCalendarPdfAllLocations(@PathVariable int year, @PathVariable int month,
+            @RequestParam(required = false, defaultValue = "false") boolean deliveryOnly) {
+        try {
+            byte[] pdfBytes = service.generateCalendarPdfAllLocations(year, month, deliveryOnly);
+            String filename = "calendario_turnos_todas_sedes_" + year + "_" + String.format("%02d", month);
+            if (deliveryOnly) {
+                filename += "_domiciliarios";
+            }
+            filename += ".pdf";
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", filename);
+            headers.setContentLength(pdfBytes.length);
+            return ResponseEntity.ok().headers(headers).body(pdfBytes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponseDto<List<Shift>>> getMyShifts() {
