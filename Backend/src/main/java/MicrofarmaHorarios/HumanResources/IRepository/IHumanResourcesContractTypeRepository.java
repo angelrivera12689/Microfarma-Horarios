@@ -9,9 +9,9 @@ import MicrofarmaHorarios.HumanResources.Entity.ContractType;
 @Repository
 public interface IHumanResourcesContractTypeRepository extends IHumanResourcesBaseRepository<ContractType, String> {
 
-    Optional<ContractType> findByNameIgnoreCase(String name);
+    Optional<ContractType> findTopByNameIgnoreCase(String name);
     
     default Optional<ContractType> findFirstByNameIgnoreCase(String name) {
-        return findByNameIgnoreCase(name);
+        return findTopByNameIgnoreCase(name);
     }
 }
